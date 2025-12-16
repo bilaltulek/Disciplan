@@ -1,15 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext'; // Hook
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 const LoginPage = () => {
+  const { login } = useAuth();
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    
+    const res = await login(formData.email, formData.password);
+    if (!res.success) {
+        setError(res.error);
+        setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      {/* Back Button */}
       <Link to="/" className="absolute top-8 left-8 text-slate-500 hover:text-slate-900 flex items-center gap-2 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Home
       </Link>
@@ -17,49 +34,41 @@ const LoginPage = () => {
       <Card className="w-full max-w-md shadow-lg border-slate-200">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
-          <CardDescription className="text-center">
-            Enter your email to sign in to your account
-          </CardDescription>
+          <CardDescription className="text-center">Enter your email to sign in</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="m@example.com" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link to="#" className="text-sm text-blue-600 hover:underline">
-                Forgot password?
-              </Link>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                    id="email" 
+                    type="email" 
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    required 
+                />
             </div>
-            <Input id="password" type="password" />
-          </div>
-          <Button className="w-full bg-blue-600 hover:bg-blue-700">
-            Sign In
-          </Button>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-200" />
+            <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input 
+                    id="password" 
+                    type="password" 
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    required 
+                />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-slate-500">Or continue with</span>
-            </div>
-          </div>
+            
+            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <Button variant="outline" className="w-full">
-            <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-              <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
-            </svg>
-            Google
-          </Button>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+              {loading ? <Loader2 className="animate-spin w-4 h-4" /> : "Sign In"}
+            </Button>
+          </form>
 
           <div className="text-center text-sm text-slate-500 mt-4">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-blue-600 font-semibold hover:underline">
-              Sign up
-            </Link>
+            <Link to="/signup" className="text-blue-600 font-semibold hover:underline">Sign up</Link>
           </div>
         </CardContent>
       </Card>
