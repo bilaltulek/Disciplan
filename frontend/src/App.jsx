@@ -8,6 +8,8 @@ import Timeline from './pages/Timeline';
 import History from './pages/History';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import Profile from './pages/Profile';
+import Settings from './pages/Settings';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -32,6 +34,12 @@ const AppRoutes = () => {
       } />
       <Route path="/history" element={
         <ProtectedRoute><History /></ProtectedRoute>
+      } />
+      <Route path="/profile" element={
+        <ProtectedRoute><Profile /></ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute><Settings /></ProtectedRoute>
       } />
     </Routes>
   );
