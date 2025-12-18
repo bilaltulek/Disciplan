@@ -1,0 +1,29 @@
+User ID,User Name,Email,Assignment ID,Title,Due Date,Task ID,Task Date,Status,Description
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,23,2025-12-18,Pending,Conduct initial research on Shakespeare's life and key works relevant to the paper's scope.
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,24,2025-12-18,Pending,"Develop a detailed outline for the paper, including main arguments, supporting points, and potential evidence."
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,25,2025-12-19,Pending,"Write the introduction and the first half of the body paragraphs (approx. 2-3 paragraphs), focusing on argument development."
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,26,2025-12-20,Pending,Write the remaining body paragraphs and the conclusion.
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,27,2025-12-20,Pending,"Perform a first self-review of the entire draft for content, structure, clarity, and argument flow. Make initial edits."
+1,John Doe,johndoe@gmail.com,4,English Paper,2025-12-21,28,2025-12-21,Pending,"Final comprehensive review and proofread for grammar, spelling, punctuation, citation style, and formatting errors. Prepare for submission."
+1,John Doe,johndoe@gmail.com,3,Calculus integrals hw,2025-12-20,20,2025-12-18,Pending,Solve Calculus integrals problems 1-3
+1,John Doe,johndoe@gmail.com,3,Calculus integrals hw,2025-12-20,21,2025-12-19,Pending,Solve Calculus integrals problems 4-6
+1,John Doe,johndoe@gmail.com,3,Calculus integrals hw,2025-12-20,22,2025-12-20,Pending,Final Review of Calculus integrals hw
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,11,2025-12-16,Completed,Review Graph Traversal (BFS/DFS) concepts and solve HW Problem 1
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,12,2025-12-17,Completed,Practice BFS/DFS problem applications and solve HW Problem 2
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,13,2025-12-18,Completed,Understand Dijkstra's Algorithm and solve HW Problem 3
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,14,2025-12-19,Pending,Study Bellman-Ford Algorithm and solve HW Problem 4
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,15,2025-12-20,Pending,Review Minimum Spanning Tree (MST) concepts and solve HW Problem 5
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,16,2025-12-21,Pending,Implement/Apply Prim's Algorithm and solve HW Problem 6
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,17,2025-12-22,Pending,Implement/Apply Kruskal's Algorithm and solve HW Problem 7
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,18,2025-12-23,Pending,Solve HW Problem 8 (remaining topic or complex graph problem) and initial self-review
+1,John Doe,johndoe@gmail.com,2,algorithms hw,2025-12-25,19,2025-12-24,Pending,"Final review of all solutions, check edge cases, and prepare for submission"
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,1,2025-12-16,Completed,"Review Derivatives: Concepts, rules, implicit differentiation, related rates. Practice 3-4 problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,2,2025-12-16,Completed,"Review Integrals (Basic & U-Substitution): Indefinite/definite integrals, FTC Part 1 & 2, u-substitution. Practice 3-4 problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,3,2025-12-16,Completed,Practice Mixed Derivatives & Integrals: Work on problems that require distinguishing between derivative and integral applications.
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,4,2025-12-17,Pending,"Study L'Hopital's Rule: Understand indeterminate forms, apply the rule to various limits. Practice 3-4 problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,5,2025-12-17,Pending,"Study Volume of Rotation (Disk/Washer Method): Concepts, setup, and solve problems using disk and washer methods. Practice 2-3 problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,6,2025-12-17,Pending,"Study Volume of Revolution (Shell Method): Concepts, setup, and solve problems using the cylindrical shell method. Practice 2-3 problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,7,2025-12-18,Completed,"Comprehensive Concept Review: Create a summary sheet of key formulas, theorems, and common pitfalls for all topics."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,8,2025-12-18,Completed,"Solve Challenging Multi-Concept Problems: Focus on problems combining 2+ concepts (e.g., L'Hopital's with limits from integral bounds, volumes with complex functions). Practice 3-4 advanced problems."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,9,2025-12-18,Pending,"Targeted Practice & Error Analysis: Review all previous practice problems, identify areas of weakness, and do extra problems specifically on those topics."
+1,John Doe,johndoe@gmail.com,1,Calculus Midterm,2025-12-20,10,2025-12-19,Pending,"Full Mock Midterm Exam: Take a timed, simulated midterm exam (e.g., a past exam or a set of 6-7 mixed problems). Afterwards, review solutions and identify remaining weak spots."
