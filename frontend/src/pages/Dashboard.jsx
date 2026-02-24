@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useState, useEffect, useMemo, useRef,
+} from 'react';
 import DashboardNav from '@/components/layout/DashboardNav';
 import { Card } from '@/components/ui/card';
 import {
@@ -8,14 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Loader2 } from 'lucide-react';
+import {
+  Plus, Loader2, Filter, ArrowUpDown, Undo2,
+} from 'lucide-react';
 import TaskCard from '@/components/features/TaskCard';
 import { apiRequest } from '@/shared/api/client';
 
 const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
+  const [pendingDeletions, setPendingDeletions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [difficultyFilter, setDifficultyFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('dueSoonest');
+  const deletionQueueRef = useRef(new Map());
 
   const [formData, setFormData] = useState({
     title: '', description: '', complexity: 'Medium', dueDate: '', totalItems: 5,
@@ -33,6 +41,34 @@ const Dashboard = () => {
   useEffect(() => {
     fetchAssignments();
   }, [fetchAssignments]);
+
+  useEffect(() => () => {
+    deletionQueueRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    deletionQueueRef.current.clear();
+  }, []);
+
+  const visibleTasks = useMemo(() => {
+    const filtered = tasks.filter((task) => (
+      difficultyFilter === 'All' ? true : task.complexity === difficultyFilter
+    ));
+
+    const withProgress = (task) => {
+      const total = Number(task.total_subtasks || 0);
+      const done = Number(task.completed_subtasks || 0);
+      return total === 0 ? 0 : done / total;
+    };
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'newest') {
+        if (a.created_at && b.created_at) return b.created_at.localeCompare(a.created_at);
+        return Number(b.id) - Number(a.id);
+      }
+      if (sortBy === 'mostProgress') return withProgress(b) - withProgress(a);
+      const aDue = a.due_date || '9999-12-31';
+      const bDue = b.due_date || '9999-12-31';
+      return aDue.localeCompare(bDue);
+    });
+  }, [tasks, difficultyFilter, sortBy]);
 
   const handleAddTask = async () => {
     setLoading(true);
@@ -60,20 +96,121 @@ const Dashboard = () => {
     }
   };
 
+  const removeTaskFromView = (taskId) => {
+    setTasks((prev) => prev.filter((task) => task.id !== taskId));
+  };
+
+  const restoreTaskToView = (taskToRestore) => {
+    setTasks((prev) => {
+      if (prev.some((task) => task.id === taskToRestore.id)) return prev;
+      return [taskToRestore, ...prev];
+    });
+  };
+
+  const finalizeAssignmentDelete = async (task) => {
+    try {
+      await apiRequest(`/api/assignments/${task.id}`, { method: 'DELETE', headers: {} });
+      setPendingDeletions((prev) => prev.filter((item) => item.task.id !== task.id));
+      deletionQueueRef.current.delete(task.id);
+    } catch (error) {
+      setPendingDeletions((prev) => prev.filter((item) => item.task.id !== task.id));
+      deletionQueueRef.current.delete(task.id);
+      restoreTaskToView(task);
+      alert(error.message || 'Failed to delete assignment.');
+    }
+  };
+
+  const handleDeleteAssignment = (task) => {
+    if (deletionQueueRef.current.has(task.id)) return;
+
+    removeTaskFromView(task.id);
+
+    const timeoutId = setTimeout(() => {
+      finalizeAssignmentDelete(task);
+    }, 5000);
+
+    deletionQueueRef.current.set(task.id, timeoutId);
+    setPendingDeletions((prev) => [...prev, { task }]);
+  };
+
+  const handleUndoDeletion = (taskId) => {
+    const timeoutId = deletionQueueRef.current.get(taskId);
+    if (timeoutId) clearTimeout(timeoutId);
+    deletionQueueRef.current.delete(taskId);
+
+    const pendingItem = pendingDeletions.find((item) => item.task.id === taskId);
+    if (pendingItem) restoreTaskToView(pendingItem.task);
+    setPendingDeletions((prev) => prev.filter((item) => item.task.id !== taskId));
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="page-shell">
       <DashboardNav />
       <main className="container mx-auto p-6 md:p-10">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Current Assignments</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">Current Assignments</h2>
+
+        {pendingDeletions.length > 0 && (
+          <div className="mb-5 space-y-2">
+            {pendingDeletions.map((item) => (
+              <div key={item.task.id} className="glass-chip rounded-xl p-3 flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold">{item.task.title}</span>
+                  {' '}
+                  will be deleted in 5 seconds.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="focus-visible:ring-2 focus-visible:ring-primary/60"
+                  onClick={() => handleUndoDeletion(item.task.id)}
+                >
+                  <Undo2 className="w-4 h-4 mr-2" />
+                  Undo
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="glass-panel rounded-2xl p-3 mb-6 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground pr-2">
+            <Filter className="w-4 h-4" />
+            Filter
+          </div>
+          {['All', 'Easy', 'Medium', 'Hard'].map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setDifficultyFilter(level)}
+              className={`px-3 py-1.5 rounded-full text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${difficultyFilter === level ? 'glass-chip text-foreground' : 'border-white/45 text-muted-foreground hover:text-foreground hover:bg-white/45'}`}
+            >
+              {level}
+            </button>
+          ))}
+
+          <div className="ml-auto flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="glass-input h-9 rounded-xl px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              aria-label="Sort assignments"
+            >
+              <option value="dueSoonest">Due Soonest</option>
+              <option value="newest">Newest</option>
+              <option value="mostProgress">Most Progress</option>
+            </select>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Card className="h-64 border-dashed border-2 border-slate-300 bg-transparent hover:bg-blue-50/50 cursor-pointer flex flex-col items-center justify-center group transition-colors">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Plus className="w-8 h-8 text-blue-600" />
+              <Card className="h-64 border-dashed border-2 border-white/60 bg-transparent hover:bg-white/35 cursor-pointer flex flex-col items-center justify-center group transition-colors">
+                <div className="w-16 h-16 glass-chip rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Plus className="w-8 h-8 text-primary" />
                 </div>
-                <span className="font-semibold text-slate-600 group-hover:text-blue-600">Add New Assignment</span>
+                <span className="font-semibold text-muted-foreground group-hover:text-primary">Add New Assignment</span>
               </Card>
             </DialogTrigger>
 
@@ -96,7 +233,7 @@ const Dashboard = () => {
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="complexity" className="text-right">Difficulty</Label>
-                  <select className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={formData.complexity} onChange={(e) => setFormData({ ...formData, complexity: e.target.value })}>
+                  <select className="glass-input col-span-3 flex h-10 w-full rounded-xl border px-3 py-2 text-sm" value={formData.complexity} onChange={(e) => setFormData({ ...formData, complexity: e.target.value })}>
                     <option value="Easy">Easy (Review)</option>
                     <option value="Medium">Medium (Standard)</option>
                     <option value="Hard">Hard (Exam Prep)</option>
@@ -108,7 +245,7 @@ const Dashboard = () => {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" onClick={handleAddTask} className="bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                <Button type="button" onClick={handleAddTask} disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {loading ? 'Generating...' : 'Create Plan'}
                 </Button>
@@ -116,10 +253,17 @@ const Dashboard = () => {
             </DialogContent>
           </Dialog>
 
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+          {visibleTasks.map((task) => (
+            <TaskCard key={task.id} task={task} onDeleteAssignment={handleDeleteAssignment} />
           ))}
         </div>
+
+        {visibleTasks.length === 0 && (
+          <Card className="mt-6 p-8 text-center glass-panel">
+            <h3 className="text-lg font-semibold text-foreground mb-1">No assignments match this view</h3>
+            <p className="text-sm text-muted-foreground">Try switching filters or sorting, or create a new assignment.</p>
+          </Card>
+        )}
       </main>
     </div>
   );

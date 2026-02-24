@@ -13,6 +13,7 @@ const {
   validateAssignment,
   validateIdParam,
   validateTaskToggle,
+  validateTaskUpdate,
 } = require('./middleware/validate');
 
 const app = express();
@@ -27,7 +28,7 @@ app.use(
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
@@ -160,6 +161,48 @@ app.post('/api/assignments', authenticateToken, validateAssignment, async (req, 
   });
 });
 
+app.delete('/api/assignments/:id', authenticateToken, validateIdParam, (req, res) => {
+  const assignmentId = req.params.id;
+  const userId = req.user.id;
+
+  db.get(
+    'SELECT id FROM assignments WHERE id = ? AND user_id = ?',
+    [assignmentId, userId],
+    (findErr, assignment) => {
+      if (findErr) return res.status(500).json({ error: findErr.message });
+      if (!assignment) return res.status(404).json({ error: 'Assignment not found.' });
+
+      db.get(
+        'SELECT COUNT(*) as count FROM study_tasks WHERE assignment_id = ?',
+        [assignmentId],
+        (countErr, row) => {
+          if (countErr) return res.status(500).json({ error: countErr.message });
+
+          const deletedTaskCount = row?.count || 0;
+
+          db.run('DELETE FROM study_tasks WHERE assignment_id = ?', [assignmentId], (taskDeleteErr) => {
+            if (taskDeleteErr) return res.status(500).json({ error: taskDeleteErr.message });
+
+            db.run(
+              'DELETE FROM assignments WHERE id = ? AND user_id = ?',
+              [assignmentId, userId],
+              function onDeleteAssignment(assignmentDeleteErr) {
+                if (assignmentDeleteErr) return res.status(500).json({ error: assignmentDeleteErr.message });
+                if (this.changes === 0) return res.status(404).json({ error: 'Assignment not found.' });
+                return res.json({
+                  message: 'Assignment deleted.',
+                  assignmentId,
+                  deletedTaskCount,
+                });
+              },
+            );
+          });
+        },
+      );
+    },
+  );
+});
+
 app.get('/api/assignment/plan/:id', authenticateToken, validateIdParam, (req, res) => {
   const sql = `
     SELECT study_tasks.* FROM study_tasks
@@ -175,6 +218,41 @@ app.get('/api/assignment/plan/:id', authenticateToken, validateIdParam, (req, re
 });
 
 app.get('/api/timeline', authenticateToken, (req, res) => {
+  const cleanupSql = `
+    DELETE FROM study_tasks
+    WHERE scheduled_date < date('now', '-10 day')
+    AND assignment_id IN (
+      SELECT id FROM assignments WHERE user_id = ?
+    )
+  `;
+
+  db.run(cleanupSql, [req.user.id], () => {
+    const sql = `
+      SELECT
+        study_tasks.*,
+        assignments.title as assignment_title,
+        assignments.complexity
+      FROM study_tasks
+      JOIN assignments ON study_tasks.assignment_id = assignments.id
+      WHERE assignments.user_id = ?
+      ORDER BY study_tasks.scheduled_date ASC
+    `;
+
+    db.all(sql, [req.user.id], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      return res.json(rows);
+    });
+  });
+});
+
+app.patch('/api/tasks/:id', authenticateToken, validateIdParam, validateTaskUpdate, (req, res) => {
+  const {
+    task_description,
+    scheduled_date,
+    estimated_minutes,
+    completed,
+  } = req.body;
+
   const sql = `
     SELECT
       study_tasks.*,
@@ -182,16 +260,55 @@ app.get('/api/timeline', authenticateToken, (req, res) => {
       assignments.complexity
     FROM study_tasks
     JOIN assignments ON study_tasks.assignment_id = assignments.id
-    WHERE assignments.user_id = ?
-    ORDER BY study_tasks.scheduled_date ASC
+    WHERE study_tasks.id = ?
+    AND assignments.user_id = ?
   `;
 
-  db.all(sql, [req.user.id], (err, rows) => {
+  db.get(sql, [req.params.id, req.user.id], (err, existing) => {
     if (err) return res.status(500).json({ error: err.message });
-    return res.json(rows);
+    if (!existing) return res.status(404).json({ error: 'Task not found.' });
+
+    const updateSql = `
+      UPDATE study_tasks
+      SET task_description = ?,
+          scheduled_date = ?,
+          estimated_minutes = ?,
+          completed = ?
+      WHERE id = ?
+    `;
+
+    const nextTaskDescription = task_description ?? existing.task_description;
+    const nextScheduledDate = scheduled_date ?? existing.scheduled_date;
+    const nextEstimatedMinutes = estimated_minutes ?? existing.estimated_minutes;
+    const nextCompleted = completed === undefined ? existing.completed : (completed ? 1 : 0);
+
+    db.run(
+      updateSql,
+      [nextTaskDescription, nextScheduledDate, nextEstimatedMinutes, nextCompleted, req.params.id],
+      function onUpdate(updateErr) {
+        if (updateErr) return res.status(500).json({ error: updateErr.message });
+        if (this.changes === 0) return res.status(404).json({ error: 'Task not found.' });
+        return res.json({ message: 'Task updated.' });
+      },
+    );
   });
 });
 
+app.delete('/api/tasks/:id', authenticateToken, validateIdParam, (req, res) => {
+  const sql = `
+    DELETE FROM study_tasks
+    WHERE id = ?
+    AND assignment_id IN (
+      SELECT id FROM assignments WHERE user_id = ?
+    )
+  `;
+
+  db.run(sql, [req.params.id, req.user.id], function onDelete(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'Task not found.' });
+    return res.json({ message: 'Task deleted.' });
+  });
+});
 app.get('/api/history', authenticateToken, (req, res) => {
   const sql = `
     SELECT

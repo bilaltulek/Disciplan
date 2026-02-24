@@ -68,10 +68,61 @@ const validateTaskToggle = (req, res, next) => {
   return next();
 };
 
+const validateTaskUpdate = (req, res, next) => {
+  const {
+    task_description, scheduled_date, estimated_minutes, completed,
+  } = req.body || {};
+  const details = [];
+
+  const hasAnyField = task_description !== undefined
+    || scheduled_date !== undefined
+    || estimated_minutes !== undefined
+    || completed !== undefined;
+
+  if (!hasAnyField) {
+    return badRequest(res, [{ field: 'body', message: 'At least one editable field is required.' }]);
+  }
+
+  if (task_description !== undefined) {
+    if (typeof task_description !== 'string' || task_description.trim().length < 3 || task_description.trim().length > 500) {
+      details.push({ field: 'task_description', message: 'task_description must be 3-500 chars.' });
+    }
+  }
+
+  if (scheduled_date !== undefined) {
+    if (typeof scheduled_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scheduled_date)) {
+      details.push({ field: 'scheduled_date', message: 'scheduled_date must be YYYY-MM-DD.' });
+    }
+  }
+
+  if (estimated_minutes !== undefined) {
+    const parsed = Number.parseInt(estimated_minutes, 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 720) {
+      details.push({ field: 'estimated_minutes', message: 'estimated_minutes must be an integer 1-720.' });
+    }
+  }
+
+  if (completed !== undefined && typeof completed !== 'boolean') {
+    details.push({ field: 'completed', message: 'completed must be boolean.' });
+  }
+
+  if (details.length) return badRequest(res, details);
+
+  req.body = {
+    task_description: typeof task_description === 'string' ? task_description.trim() : undefined,
+    scheduled_date,
+    estimated_minutes: estimated_minutes !== undefined ? Number.parseInt(estimated_minutes, 10) : undefined,
+    completed,
+  };
+
+  return next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
   validateAssignment,
   validateIdParam,
   validateTaskToggle,
+  validateTaskUpdate,
 };

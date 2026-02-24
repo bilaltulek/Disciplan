@@ -1,59 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 218 55% 95%;
+    --foreground: 220 33% 15%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 33% 16%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 220 33% 16%;
+    --primary: 206 92% 54%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 45% 90%;
+    --secondary-foreground: 220 30% 20%;
+    --muted: 216 32% 90%;
+    --muted-foreground: 220 20% 40%;
+    --accent: 195 88% 92%;
+    --accent-foreground: 218 42% 20%;
+    --destructive: 2 81% 57%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --border: 214 45% 84%;
+    --input: 213 52% 97%;
+    --ring: 206 92% 54%;
+    --radius: 1rem;
   }
  
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --background: 226 31% 9%;
+    --foreground: 210 30% 95%;
+    --card: 225 25% 14%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 225 24% 13%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 199 90% 62%;
+    --primary-foreground: 220 42% 11%;
+    --secondary: 224 21% 20%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 224 16% 18%;
+    --muted-foreground: 214 20% 72%;
+    --accent: 206 38% 24%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 3 73% 45%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 223 22% 26%;
+    --input: 224 20% 20%;
+    --ring: 199 90% 62%;
   }
 }
  
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border/70;
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "Manrope", sans-serif;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 16% 18%, rgba(87, 197, 255, 0.28), transparent 28%),
+      radial-gradient(circle at 86% 12%, rgba(174, 122, 255, 0.22), transparent 30%),
+      radial-gradient(circle at 30% 88%, rgba(74, 222, 128, 0.2), transparent 26%),
+      linear-gradient(170deg, #f8fbff 0%, #e8f0ff 44%, #e5ebf9 100%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 {
+    font-family: "Sora", sans-serif;
+    letter-spacing: -0.02em;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply min-h-screen text-foreground;
+  }
+  .glass-panel {
+    @apply border border-white/45 bg-white/40 backdrop-blur-xl shadow-[0_20px_60px_-25px_rgba(18,35,74,0.45)];
+  }
+  .glass-nav {
+    @apply border-b border-white/45 bg-white/45 backdrop-blur-xl shadow-[0_12px_40px_-28px_rgba(19,35,67,0.65)];
+  }
+  .glass-input {
+    @apply border-white/50 bg-white/40 backdrop-blur-lg;
+  }
+  .glass-chip {
+    @apply border border-white/55 bg-white/45 backdrop-blur-md;
+  }
+  .glass-accent {
+    @apply bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-[0_18px_38px_-16px_rgba(4,116,203,0.9)];
+  }
+  .task-hue-easy {
+    @apply border-emerald-200/60 bg-gradient-to-br from-emerald-100/50 via-white/40 to-emerald-50/30;
+  }
+  .task-hue-medium {
+    @apply border-amber-200/60 bg-gradient-to-br from-amber-100/50 via-white/40 to-amber-50/30;
+  }
+  .task-hue-hard {
+    @apply border-rose-200/60 bg-gradient-to-br from-rose-100/50 via-white/40 to-red-50/30;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    background-size: 180% 180%;
   }
 }

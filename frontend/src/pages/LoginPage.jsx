@@ -26,12 +26,12 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <Link to="/" className="absolute top-8 left-8 text-slate-500 hover:text-slate-900 flex items-center gap-2 transition-colors">
+    <div className="page-shell flex items-center justify-center p-4">
+      <Link to="/" className="absolute top-8 left-8 text-muted-foreground hover:text-foreground flex items-center gap-2 transition-colors glass-chip px-3 py-2 rounded-xl">
         <ArrowLeft className="w-4 h-4" /> Back to Home
       </Link>
 
-      <Card className="w-full max-w-md shadow-lg border-slate-200">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
           <CardDescription className="text-center">Enter your email to sign in</CardDescription>
@@ -61,14 +61,14 @@ const LoginPage = () => {
             
             {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-            <Button className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+            <Button className="w-full" disabled={loading}>
               {loading ? <Loader2 className="animate-spin w-4 h-4" /> : "Sign In"}
             </Button>
           </form>
 
-          <div className="text-center text-sm text-slate-500 mt-4">
+          <div className="text-center text-sm text-muted-foreground mt-4">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-blue-600 font-semibold hover:underline">Sign up</Link>
+            <Link to="/signup" className="text-primary font-semibold hover:underline">Sign up</Link>
           </div>
         </CardContent>
       </Card>

@@ -125,7 +125,7 @@ function insertAssignments() {
   return new Promise((resolve, reject) => {
     const stmt = db.prepare(`
       INSERT INTO assignments (user_id, title, complexity, due_date, description, created_at)
-      VALUES (?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     const assignments = [];
