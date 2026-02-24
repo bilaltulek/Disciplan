@@ -1,10 +1,8 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const config = require('./config.env');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// UPDATE: Use the specific version string
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const genAI = new GoogleGenerativeAI(config.geminiApiKey);
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 async function generateStudyPlan(assignment) {
   const { title, description, complexity, dueDate, totalItems } = assignment;
@@ -12,7 +10,7 @@ async function generateStudyPlan(assignment) {
 
   const prompt = `
     You are an expert academic planner. Create a daily study schedule.
-    
+
     CONTEXT:
     - Assignment: "${title}"
     - Description: "${description}"
@@ -23,12 +21,12 @@ async function generateStudyPlan(assignment) {
 
     INSTRUCTIONS:
     1. Calculate the number of days available between today and the due date.
-    2. Break the workload down intelligently. 
+    2. Break the workload down intelligently.
        - If it's a "Hard" math assignment, schedule fewer problems per day.
        - If it's a writing assignment, split it into Outline -> Draft -> Review.
        - Ensure the last day is reserved for "Final Review".
     3. Return ONLY a valid JSON array. Do not include markdown formatting or backticks.
-    
+
     JSON FORMAT:
     [
       {
@@ -43,21 +41,19 @@ async function generateStudyPlan(assignment) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     let text = response.text();
-    
-    // UPDATE: Robust JSON cleanup
+
     const firstBracket = text.indexOf('[');
     const lastBracket = text.lastIndexOf(']');
-    
+
     if (firstBracket !== -1 && lastBracket !== -1) {
-        text = text.substring(firstBracket, lastBracket + 1);
-        return JSON.parse(text);
-    } else {
-        console.error("Gemini did not return a valid JSON array:", text);
-        return [];
+      text = text.substring(firstBracket, lastBracket + 1);
+      return JSON.parse(text);
     }
 
+    console.error('Gemini did not return a valid JSON array:', text);
+    return [];
   } catch (error) {
-    console.error("Gemini Plan Generation Failed:", error);
+    console.error('Gemini Plan Generation Failed:', error);
     return [];
   }
 }

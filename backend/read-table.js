@@ -21,7 +21,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 // Validate table name to prevent SQL injection
-const allowedTables = ['assignments', 'study_tasks'];
+const allowedTables = ['users', 'assignments', 'study_tasks'];
 if (!allowedTables.includes(tableName)) {
   console.error(`Error: Invalid table name. Allowed tables: ${allowedTables.join(', ')}`);
   db.close();

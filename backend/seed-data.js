@@ -124,7 +124,7 @@ function getEstimatedDuration(complexity) {
 function insertAssignments() {
   return new Promise((resolve, reject) => {
     const stmt = db.prepare(`
-      INSERT INTO assignments (title, complexity, due_date, description, created_at)
+      INSERT INTO assignments (user_id, title, complexity, due_date, description, created_at)
       VALUES (?, ?, ?, ?, ?)
     `);
 
@@ -140,7 +140,7 @@ function insertAssignments() {
       
       assignments.push({ title, complexity, dueDate, description, createdAt });
       
-      stmt.run(title, complexity, dueDate, description, createdAt, (err) => {
+      stmt.run(1, title, complexity, dueDate, description, createdAt, (err) => {
         if (err) {
           console.error('Error inserting assignment:', err.message);
         }
@@ -169,7 +169,7 @@ function insertStudyTasks() {
       }
 
       const stmt = db.prepare(`
-        INSERT INTO study_tasks (assignment_id, task_description, scheduled_date, completed, estimated_duration)
+        INSERT INTO study_tasks (assignment_id, task_description, scheduled_date, completed, estimated_minutes)
         VALUES (?, ?, ?, ?, ?)
       `);
 

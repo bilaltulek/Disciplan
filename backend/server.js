@@ -1,135 +1,166 @@
 const express = require('express');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = process.env.JWT_SECRET || 'your_super_secret_key_123';
-require('dotenv').config();
 
+const config = require('./config.env');
 const db = require('./database');
 const { generateStudyPlan } = require('./gemini-planner');
+const { authenticateToken } = require('./middleware/auth');
+const {
+  validateRegister,
+  validateLogin,
+  validateAssignment,
+  validateIdParam,
+  validateTaskToggle,
+} = require('./middleware/validate');
 
 const app = express();
-const PORT = 5000;
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || config.corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }),
+);
+app.use(express.json());
 
+const authAttempts = new Map();
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_MAX_ATTEMPTS = 20;
 
-// Middleware to check if user is logged in
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN_HERE
+const authRateLimiter = (req, res, next) => {
+  const key = req.ip || 'unknown';
+  const now = Date.now();
+  const attempt = authAttempts.get(key) || { count: 0, start: now };
 
-  if (!token) return res.sendStatus(401); // No token? Get out.
+  if (now - attempt.start > AUTH_WINDOW_MS) {
+    authAttempts.set(key, { count: 1, start: now });
+    return next();
+  }
 
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403); // Invalid token? Get out.
-    req.user = user; // Save user info for the next step
-    next();
-  });
+  if (attempt.count >= AUTH_MAX_ATTEMPTS) {
+    return res.status(429).json({ error: 'Too many authentication attempts. Try again later.' });
+  }
+
+  attempt.count += 1;
+  authAttempts.set(key, attempt);
+  return next();
 };
 
+const issueToken = (userId) => jwt.sign({ id: userId }, config.jwtSecret, { expiresIn: '24h' });
 
-// ------------------------------------------
-// A. REGISTER USER
-// ------------------------------------------
-app.post('/api/register', (req, res) => {
+const setAuthCookie = (res, token) => {
+  const secure = config.isProduction ? ' Secure;' : '';
+  res.setHeader('Set-Cookie', `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400;${secure}`);
+};
+
+app.post('/api/register', authRateLimiter, validateRegister, (req, res) => {
   const { email, password, name } = req.body;
-  const hashedPassword = bcrypt.hashSync(password, 8);
+  const hashedPassword = bcrypt.hashSync(password, 12);
 
-  db.run(`INSERT INTO users (email, password, name) VALUES (?, ?, ?)`, 
-    [email, hashedPassword, name], 
-    function(err) {
-      if (err) return res.status(500).json({ error: "Email already exists." });
-      
-      // Auto-login after register
-      const token = jwt.sign({ id: this.lastID }, SECRET_KEY, { expiresIn: '24h' });
-      res.json({ token, user: { id: this.lastID, email, name } });
+  db.run('INSERT INTO users (email, password, name) VALUES (?, ?, ?)', [email, hashedPassword, name], function onInsert(err) {
+    if (err) {
+      return res.status(409).json({ error: 'Account could not be created.' });
     }
-  );
-});
 
-// ------------------------------------------
-// B. LOGIN USER
-// ------------------------------------------
-app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
-
-  db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
-    if (err || !user) return res.status(404).json({ error: "User not found." });
-
-    const isValid = bcrypt.compareSync(password, user.password);
-    if (!isValid) return res.status(401).json({ error: "Invalid password." });
-
-    const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: '24h' });
-    res.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+    const token = issueToken(this.lastID);
+    setAuthCookie(res, token);
+    return res.json({ user: { id: this.lastID, email, name } });
   });
 });
 
-// ------------------------------------------
-// 1. GET ALL ASSIGNMENTS (Protected & User Specific)
-// ------------------------------------------
+app.post('/api/login', authRateLimiter, validateLogin, (req, res) => {
+  const { email, password } = req.body;
+
+  db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
+    if (err || !user) return res.status(401).json({ error: 'Invalid credentials.' });
+
+    const isValid = bcrypt.compareSync(password, user.password);
+    if (!isValid) return res.status(401).json({ error: 'Invalid credentials.' });
+
+    const token = issueToken(user.id);
+    setAuthCookie(res, token);
+    return res.json({ user: { id: user.id, email: user.email, name: user.name } });
+  });
+});
+
+app.post('/api/logout', (_req, res) => {
+  res.setHeader('Set-Cookie', 'token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0;');
+  res.json({ message: 'Logged out.' });
+});
+
+app.get('/api/me', authenticateToken, (req, res) => {
+  db.get('SELECT id, email, name FROM users WHERE id = ?', [req.user.id], (err, user) => {
+    if (err || !user) return res.status(404).json({ error: 'User not found.' });
+    return res.json({ user });
+  });
+});
+
 app.get('/api/assignments', authenticateToken, (req, res) => {
-  const userId = req.user.id; // Get ID from the token
-  
   const sql = `
-    SELECT 
+    SELECT
       a.*,
       COUNT(t.id) as total_subtasks,
       SUM(CASE WHEN t.completed = 1 THEN 1 ELSE 0 END) as completed_subtasks
     FROM assignments a
     LEFT JOIN study_tasks t ON a.id = t.assignment_id
-    WHERE a.user_id = ?  
+    WHERE a.user_id = ?
     GROUP BY a.id
     ORDER BY a.created_at DESC
   `;
-  
-  // We pass userId into the query so we ONLY get this user's rows
-  db.all(sql, [userId], (err, rows) => {
+
+  db.all(sql, [req.user.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    return res.json(rows);
   });
 });
 
-// ------------------------------------------
-// 2. CREATE ASSIGNMENT (Protected)
-// ------------------------------------------
-app.post('/api/assignments', authenticateToken, async (req, res) => {
-  const { title, complexity, dueDate, description, totalItems } = req.body;
-  const userId = req.user.id; // Get ID from the token
+app.post('/api/assignments', authenticateToken, validateAssignment, async (req, res) => {
+  const {
+    title, complexity, dueDate, description, totalItems,
+  } = req.body;
 
-  const sqlInsert = `INSERT INTO assignments (user_id, title, complexity, due_date, total_items, description) VALUES (?, ?, ?, ?, ?, ?)`;
-  
-  db.run(sqlInsert, [userId, title, complexity, dueDate, totalItems, description], async function(err) {
+  const sqlInsert = 'INSERT INTO assignments (user_id, title, complexity, due_date, total_items, description) VALUES (?, ?, ?, ?, ?, ?)';
+
+  db.run(sqlInsert, [req.user.id, title, complexity, dueDate, totalItems, description], async function onInsert(err) {
     if (err) return res.status(500).json({ error: err.message });
-    
+
     const assignmentId = this.lastID;
-    
-    // AI PLANNER (Same as before)
+
     try {
-      const plan = await generateStudyPlan({ title, complexity, dueDate, description, totalItems });
+      const plan = await generateStudyPlan({
+        title,
+        complexity,
+        dueDate,
+        description,
+        totalItems,
+      });
+
       if (plan.length > 0) {
-        const stmt = db.prepare(`INSERT INTO study_tasks (assignment_id, task_description, scheduled_date, estimated_minutes) VALUES (?, ?, ?, ?)`);
-        plan.forEach(task => {
+        const stmt = db.prepare('INSERT INTO study_tasks (assignment_id, task_description, scheduled_date, estimated_minutes) VALUES (?, ?, ?, ?)');
+        plan.forEach((task) => {
           stmt.run(assignmentId, task.task_description, task.scheduled_date, task.estimated_minutes);
         });
         stmt.finalize();
       }
-      res.status(201).json({ message: 'Assignment created', id: assignmentId });
-    } catch (aiError) {
-      res.status(500).json({ error: "Saved, but AI failed." });
+
+      return res.status(201).json({ message: 'Assignment created', id: assignmentId });
+    } catch (_aiError) {
+      return res.status(500).json({ error: 'Saved, but AI failed.' });
     }
   });
 });
 
-// ------------------------------------------
-// 3. GET ASSIGNMENT PLAN (Strict Ownership Check)
-// ------------------------------------------
-app.get('/api/assignment/plan/:id', authenticateToken, (req, res) => {
-  const assignmentId = req.params.id;
-  const userId = req.user.id;
-
+app.get('/api/assignment/plan/:id', authenticateToken, validateIdParam, (req, res) => {
   const sql = `
     SELECT study_tasks.* FROM study_tasks
     JOIN assignments ON study_tasks.assignment_id = assignments.id
@@ -137,44 +168,33 @@ app.get('/api/assignment/plan/:id', authenticateToken, (req, res) => {
     ORDER BY study_tasks.scheduled_date ASC
   `;
 
-  db.all(sql, [assignmentId, userId], (err, rows) => {
+  db.all(sql, [req.params.id, req.user.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    // If no rows found, it might mean empty plan OR access denied. 
-    // In strict production, you might check for assignment existence first, 
-    // but this query is safe: it returns nothing if you don't own it.
-    res.json(rows);
+    return res.json(rows);
   });
 });
 
-// ------------------------------------------
-// 4. GET TIMELINE (Protected)
-// ------------------------------------------
 app.get('/api/timeline', authenticateToken, (req, res) => {
-  const userId = req.user.id;
   const sql = `
-    SELECT 
+    SELECT
       study_tasks.*,
-      assignments.title as assignment_title, 
-      assignments.complexity 
-    FROM study_tasks 
-    JOIN assignments ON study_tasks.assignment_id = assignments.id 
+      assignments.title as assignment_title,
+      assignments.complexity
+    FROM study_tasks
+    JOIN assignments ON study_tasks.assignment_id = assignments.id
     WHERE assignments.user_id = ?
     ORDER BY study_tasks.scheduled_date ASC
   `;
 
-  db.all(sql, [userId], (err, rows) => {
+  db.all(sql, [req.user.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    return res.json(rows);
   });
 });
 
-// ------------------------------------------
-// 5. GET HISTORY (Protected)
-// ------------------------------------------
 app.get('/api/history', authenticateToken, (req, res) => {
-  const userId = req.user.id;
   const sql = `
-    SELECT 
+    SELECT
       study_tasks.*,
       assignments.title as assignment_title,
       assignments.complexity
@@ -184,40 +204,31 @@ app.get('/api/history', authenticateToken, (req, res) => {
     ORDER BY study_tasks.scheduled_date DESC
   `;
 
-  db.all(sql, [userId], (err, rows) => {
+  db.all(sql, [req.user.id], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    return res.json(rows);
   });
 });
 
-// ------------------------------------------
-// 6. TOGGLE TASK COMPLETION (Strict Ownership Check)
-// ------------------------------------------
-app.patch('/api/tasks/:id/toggle', authenticateToken, (req, res) => {
-  const taskId = req.params.id;
-  const { completed } = req.body;
-  const userId = req.user.id;
-
-  // Complex Query: Update the task ONLY IF it links to an assignment owned by this user
+app.patch('/api/tasks/:id/toggle', authenticateToken, validateIdParam, validateTaskToggle, (req, res) => {
   const sql = `
-    UPDATE study_tasks 
-    SET completed = ? 
-    WHERE id = ? 
+    UPDATE study_tasks
+    SET completed = ?
+    WHERE id = ?
     AND assignment_id IN (
-        SELECT id FROM assignments WHERE user_id = ?
+      SELECT id FROM assignments WHERE user_id = ?
     )
   `;
-  
-  db.run(sql, [completed ? 1 : 0, taskId, userId], function(err) {
+
+  db.run(sql, [req.body.completed ? 1 : 0, req.params.id, req.user.id], function onUpdate(err) {
     if (err) return res.status(500).json({ error: err.message });
     if (this.changes === 0) {
-        // If changes is 0, it means either task didn't exist OR you don't own it.
-        return res.status(403).json({ error: "Access denied or task not found." });
+      return res.status(403).json({ error: 'Access denied or task not found.' });
     }
-    res.json({ message: "Task updated", changes: this.changes });
+    return res.json({ message: 'Task updated', changes: this.changes });
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(config.port, () => {
+  console.log(`Server running on http://localhost:${config.port}`);
 });

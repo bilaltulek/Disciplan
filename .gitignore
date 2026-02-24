@@ -1,1 +1,12 @@
-node_modules
+node_modules/
+**/node_modules/
+
+.env
+.env.*
+
+*.db
+*.sqlite
+
+backend/scripts/*.csv
+
+.DS_Store
