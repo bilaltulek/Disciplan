@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '@/shared/api/client';
 
 const AuthContext = createContext(null);
+const allowedStartPages = new Set(['dashboard', 'timeline', 'history']);
+const toStartRoute = (startPage) => (allowedStartPages.has(startPage) ? `/${startPage}` : '/dashboard');
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -33,7 +35,16 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password }),
       });
       setUser(data.user);
-      navigate('/dashboard');
+
+      let startRoute = '/dashboard';
+      try {
+        const settingsData = await apiRequest('/api/settings', { method: 'GET', headers: {} });
+        startRoute = toStartRoute(settingsData?.settings?.start_page);
+      } catch {
+        startRoute = '/dashboard';
+      }
+
+      navigate(startRoute);
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };
@@ -47,7 +58,16 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ name, email, password }),
       });
       setUser(data.user);
-      navigate('/dashboard');
+
+      let startRoute = '/dashboard';
+      try {
+        const settingsData = await apiRequest('/api/settings', { method: 'GET', headers: {} });
+        startRoute = toStartRoute(settingsData?.settings?.start_page);
+      } catch {
+        startRoute = '/dashboard';
+      }
+
+      navigate(startRoute);
       return { success: true };
     } catch (err) {
       return { success: false, error: err.message };

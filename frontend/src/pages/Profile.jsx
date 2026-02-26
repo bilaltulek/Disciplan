@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { User, Mail, Shield } from "lucide-react";
+import { useSettings } from '@/context/SettingsContext';
 
 const Profile = () => {
   const { user, logout } = useAuth();
+  const { settings } = useSettings();
 
   // Helper to get initials (e.g. "John Doe" -> "JD")
   const getInitials = (name) => {
@@ -56,6 +58,23 @@ const Profile = () => {
                         <Shield className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input id="role" value="Student" readOnly className="pl-9" />
                     </div>
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+            <CardHeader>
+                <CardTitle>Preferences</CardTitle>
+                <CardDescription>Current app preferences from your settings.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="pref-theme">Theme</Label>
+                    <Input id="pref-theme" value={settings.theme_mode} readOnly />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="pref-start-page">Start Page</Label>
+                    <Input id="pref-start-page" value={settings.start_page} readOnly />
                 </div>
             </CardContent>
         </Card>

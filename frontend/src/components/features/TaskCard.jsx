@@ -23,8 +23,8 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
       ? 'task-hue-medium'
       : 'task-hue-easy';
   const mutedTextClass = task.complexity === 'Hard' || task.complexity === 'Medium'
-    ? 'text-slate-600'
-    : 'text-muted-foreground';
+    ? 'text-slate-600 dark:text-white'
+    : 'text-muted-foreground dark:text-white';
 
   const loadPlan = async () => {
     setLoading(true);
@@ -79,10 +79,10 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
             <span className={`text-xs font-bold uppercase tracking-wider ${mutedTextClass}`}>{task.complexity}</span>
             <span className={`glass-chip text-xs flex items-center gap-1 px-2 py-1 rounded-full ${mutedTextClass}`}><Calendar className="w-3 h-3" /> {task.due_date}</span>
           </div>
-          <h3 className="font-bold text-lg mb-2 leading-tight text-foreground">{task.title}</h3>
+          <h3 className="font-bold text-lg mb-2 leading-tight text-foreground dark:text-white">{task.title}</h3>
           {totalCount > 0 ? (
             <div className="mb-4">
-              <div className={`flex justify-between text-xs mb-1 ${mutedTextClass}`}><span>Progress</span><span>{progressPercent}%</span></div>
+              <div className={`flex justify-between text-xs mb-1 ${mutedTextClass}`}><span>Progress</span><span className="dark:text-white">{progressPercent}%</span></div>
               <div className="w-full h-2 bg-white/50 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-500" style={{ width: `${progressPercent}%` }} /></div>
             </div>
           ) : (<p className={`text-sm line-clamp-3 mb-4 ${mutedTextClass}`}>{task.description || 'No description provided.'}</p>)}
@@ -90,14 +90,14 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
 
           <div className="mt-auto pt-4 flex items-center gap-2">
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex-1 hover:text-primary transition-all focus-visible:ring-2 focus-visible:ring-primary/60">
+              <Button variant="outline" className="flex-1 hover:text-primary transition-all focus-visible:ring-2 focus-visible:ring-primary/60 dark:text-white dark:border-white/35">
                 {totalCount > 0 ? 'Continue Plan' : 'View Breakdown'}
               </Button>
             </DialogTrigger>
             <Button
               type="button"
               variant="outline"
-              className="glass-chip border-red-300/70 text-red-700 hover:bg-red-50/60 focus-visible:ring-2 focus-visible:ring-red-300"
+              className="glass-chip border-red-300/70 text-red-700 hover:bg-red-50/60 focus-visible:ring-2 focus-visible:ring-red-300 dark:text-red-300 dark:border-red-300/60 dark:hover:bg-red-900/30"
               onClick={handleDeleteClick}
               aria-label={`Delete assignment ${task.title}`}
             >

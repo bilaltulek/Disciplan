@@ -14,6 +14,7 @@ const {
   validateIdParam,
   validateTaskToggle,
   validateTaskUpdate,
+  validateSettingsPatch,
 } = require('./middleware/validate');
 
 const app = express();
@@ -64,6 +65,52 @@ const setAuthCookie = (res, token) => {
   res.setHeader('Set-Cookie', `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400;${secure}`);
 };
 
+const defaultSettings = {
+  theme_mode: 'light',
+  start_page: 'dashboard',
+  assignment_default_complexity: 'Medium',
+  assignment_default_items: 5,
+  confirm_assignment_delete: true,
+};
+
+const normalizeSettings = (row) => ({
+  theme_mode: row?.theme_mode || defaultSettings.theme_mode,
+  start_page: row?.start_page || defaultSettings.start_page,
+  assignment_default_complexity: row?.assignment_default_complexity || defaultSettings.assignment_default_complexity,
+  assignment_default_items: Number.parseInt(row?.assignment_default_items, 10) || defaultSettings.assignment_default_items,
+  confirm_assignment_delete: row?.confirm_assignment_delete === undefined
+    ? defaultSettings.confirm_assignment_delete
+    : !!row.confirm_assignment_delete,
+});
+
+const insertDefaultSettingsIfMissing = (userId, callback) => {
+  const sql = `
+    INSERT INTO user_settings (
+      user_id,
+      theme_mode,
+      start_page,
+      assignment_default_complexity,
+      assignment_default_items,
+      confirm_assignment_delete
+    )
+    SELECT ?, ?, ?, ?, ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE user_id = ?)
+  `;
+  db.run(
+    sql,
+    [
+      userId,
+      defaultSettings.theme_mode,
+      defaultSettings.start_page,
+      defaultSettings.assignment_default_complexity,
+      defaultSettings.assignment_default_items,
+      defaultSettings.confirm_assignment_delete ? 1 : 0,
+      userId,
+    ],
+    callback,
+  );
+};
+
 app.post('/api/register', authRateLimiter, validateRegister, (req, res) => {
   const { email, password, name } = req.body;
   const hashedPassword = bcrypt.hashSync(password, 12);
@@ -73,9 +120,13 @@ app.post('/api/register', authRateLimiter, validateRegister, (req, res) => {
       return res.status(409).json({ error: 'Account could not be created.' });
     }
 
-    const token = issueToken(this.lastID);
-    setAuthCookie(res, token);
-    return res.json({ user: { id: this.lastID, email, name } });
+    const userId = this.lastID;
+    insertDefaultSettingsIfMissing(userId, (settingsErr) => {
+      if (settingsErr) return res.status(500).json({ error: settingsErr.message });
+      const token = issueToken(userId);
+      setAuthCookie(res, token);
+      return res.json({ user: { id: userId, email, name } });
+    });
   });
 });
 
@@ -103,6 +154,80 @@ app.get('/api/me', authenticateToken, (req, res) => {
   db.get('SELECT id, email, name FROM users WHERE id = ?', [req.user.id], (err, user) => {
     if (err || !user) return res.status(404).json({ error: 'User not found.' });
     return res.json({ user });
+  });
+});
+
+app.get('/api/settings', authenticateToken, (req, res) => {
+  insertDefaultSettingsIfMissing(req.user.id, (insertErr) => {
+    if (insertErr) return res.status(500).json({ error: insertErr.message });
+
+    db.get(
+      `SELECT
+        theme_mode,
+        start_page,
+        assignment_default_complexity,
+        assignment_default_items,
+        confirm_assignment_delete
+      FROM user_settings
+      WHERE user_id = ?`,
+      [req.user.id],
+      (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        return res.json({ settings: normalizeSettings(row) });
+      },
+    );
+  });
+});
+
+app.patch('/api/settings', authenticateToken, validateSettingsPatch, (req, res) => {
+  insertDefaultSettingsIfMissing(req.user.id, (insertErr) => {
+    if (insertErr) return res.status(500).json({ error: insertErr.message });
+
+    db.get(
+      `SELECT
+        theme_mode,
+        start_page,
+        assignment_default_complexity,
+        assignment_default_items,
+        confirm_assignment_delete
+      FROM user_settings
+      WHERE user_id = ?`,
+      [req.user.id],
+      (getErr, existingRow) => {
+        if (getErr) return res.status(500).json({ error: getErr.message });
+
+        const merged = {
+          ...normalizeSettings(existingRow),
+          ...Object.fromEntries(
+            Object.entries(req.body).filter(([, value]) => value !== undefined),
+          ),
+        };
+
+        db.run(
+          `UPDATE user_settings
+          SET theme_mode = ?,
+              start_page = ?,
+              assignment_default_complexity = ?,
+              assignment_default_items = ?,
+              confirm_assignment_delete = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ?`,
+          [
+            merged.theme_mode,
+            merged.start_page,
+            merged.assignment_default_complexity,
+            merged.assignment_default_items,
+            merged.confirm_assignment_delete ? 1 : 0,
+            req.user.id,
+          ],
+          function onSettingsUpdate(updateErr) {
+            if (updateErr) return res.status(500).json({ error: updateErr.message });
+            if (this.changes === 0) return res.status(404).json({ error: 'Settings not found.' });
+            return res.json({ settings: merged });
+          },
+        );
+      },
+    );
   });
 });
 

@@ -66,6 +66,13 @@
       linear-gradient(170deg, #f8fbff 0%, #e8f0ff 44%, #e5ebf9 100%);
     background-attachment: fixed;
   }
+  .dark body {
+    background-image:
+      radial-gradient(circle at 16% 18%, rgba(14, 165, 233, 0.18), transparent 30%),
+      radial-gradient(circle at 84% 14%, rgba(56, 189, 248, 0.14), transparent 34%),
+      radial-gradient(circle at 26% 88%, rgba(16, 185, 129, 0.12), transparent 30%),
+      linear-gradient(165deg, #0a1222 0%, #111b2f 48%, #0a1020 100%);
+  }
   h1, h2, h3, h4 {
     font-family: "Sora", sans-serif;
     letter-spacing: -0.02em;
@@ -94,6 +101,31 @@
   .glass-accent {
     @apply bg-gradient-to-br from-sky-500 to-cyan-400 text-white shadow-[0_18px_38px_-16px_rgba(4,116,203,0.9)];
   }
+  .dark .glass-panel {
+    @apply border-white/15 bg-slate-900/45 shadow-[0_20px_60px_-30px_rgba(2,6,23,0.95)];
+  }
+  .dark .glass-nav {
+    @apply border-white/15 bg-slate-900/55 shadow-[0_16px_38px_-22px_rgba(2,6,23,0.95)];
+  }
+  .dark .glass-chip {
+    @apply border-white/20 bg-slate-800/45;
+  }
+  .dark .glass-input {
+    @apply border-white/20 bg-slate-900/40;
+  }
+  .dark .warp-stack,
+  .dark .warp-stack-card-empty,
+  .dark .warp-front-surface,
+  .dark .warp-back-surface,
+  .dark .warp-stack-card,
+  .dark .timeline-day-panel,
+  .dark .timeline-depth-future .timeline-day-panel,
+  .dark .timeline-depth-past .timeline-day-panel {
+    @apply border-white/15 bg-slate-900/45;
+  }
+  .dark .timeline-task-row {
+    @apply border-slate-700/80 bg-slate-800/70;
+  }
   .landing-nav {
     @apply sticky top-0 z-50 transition-all duration-200;
   }
@@ -110,13 +142,13 @@
     @apply container mx-auto px-4 md:px-6 py-16 md:py-24;
   }
   .task-hue-easy {
-    @apply border-emerald-200/60 bg-gradient-to-br from-emerald-100/50 via-white/40 to-emerald-50/30;
+    @apply border-emerald-300/60 bg-gradient-to-br from-emerald-300/40 via-emerald-100/25 to-emerald-200/20;
   }
   .task-hue-medium {
-    @apply border-amber-200/60 bg-gradient-to-br from-amber-100/50 via-white/40 to-amber-50/30;
+    @apply border-amber-300/60 bg-gradient-to-br from-amber-300/40 via-amber-100/25 to-yellow-200/20;
   }
   .task-hue-hard {
-    @apply border-rose-200/60 bg-gradient-to-br from-rose-100/50 via-white/40 to-red-50/30;
+    @apply border-rose-300/60 bg-gradient-to-br from-rose-300/40 via-rose-100/25 to-red-200/30;
   }
   .warp-nav-controls {
     @apply shadow-[0_18px_45px_-26px_rgba(15,23,42,0.7)];

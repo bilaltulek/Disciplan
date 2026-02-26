@@ -15,8 +15,10 @@ import {
 } from 'lucide-react';
 import TaskCard from '@/components/features/TaskCard';
 import { apiRequest } from '@/shared/api/client';
+import { useSettings } from '@/context/SettingsContext';
 
 const Dashboard = () => {
+  const { settings } = useSettings();
   const [tasks, setTasks] = useState([]);
   const [pendingDeletions, setPendingDeletions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -26,8 +28,21 @@ const Dashboard = () => {
   const deletionQueueRef = useRef(new Map());
 
   const [formData, setFormData] = useState({
-    title: '', description: '', complexity: 'Medium', dueDate: '', totalItems: 5,
+    title: '',
+    description: '',
+    complexity: settings.assignment_default_complexity,
+    dueDate: '',
+    totalItems: settings.assignment_default_items,
   });
+
+  useEffect(() => {
+    if (isOpen) return;
+    setFormData((prev) => ({
+      ...prev,
+      complexity: settings.assignment_default_complexity,
+      totalItems: settings.assignment_default_items,
+    }));
+  }, [settings.assignment_default_complexity, settings.assignment_default_items, isOpen]);
 
   const fetchAssignments = React.useCallback(async () => {
     try {
@@ -87,7 +102,11 @@ const Dashboard = () => {
       await fetchAssignments();
       setIsOpen(false);
       setFormData({
-        title: '', description: '', complexity: 'Medium', dueDate: '', totalItems: 5,
+        title: '',
+        description: '',
+        complexity: settings.assignment_default_complexity,
+        dueDate: '',
+        totalItems: settings.assignment_default_items,
       });
     } catch (error) {
       alert(error.message || 'Failed to create plan.');
@@ -122,6 +141,7 @@ const Dashboard = () => {
 
   const handleDeleteAssignment = (task) => {
     if (deletionQueueRef.current.has(task.id)) return;
+    if (settings.confirm_assignment_delete && !window.confirm('Delete this assignment? You can still undo within 5 seconds.')) return;
 
     removeTaskFromView(task.id);
 

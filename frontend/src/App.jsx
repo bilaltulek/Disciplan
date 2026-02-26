@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext'; // Import new context
+import { SettingsProvider } from './context/SettingsContext';
 
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -49,7 +50,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <SettingsProvider>
+          <AppRoutes />
+        </SettingsProvider>
       </AuthProvider>
     </Router>
   );

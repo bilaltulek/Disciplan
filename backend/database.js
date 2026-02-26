@@ -39,6 +39,26 @@ db.serialize(() => {
     estimated_minutes INTEGER,
     FOREIGN KEY (assignment_id) REFERENCES assignments(id) ON DELETE CASCADE
   )`);
+
+  // 4. User Settings Table
+  db.run(`CREATE TABLE IF NOT EXISTS user_settings (
+    user_id INTEGER PRIMARY KEY,
+    theme_mode TEXT NOT NULL DEFAULT 'light',
+    start_page TEXT NOT NULL DEFAULT 'dashboard',
+    assignment_default_complexity TEXT NOT NULL DEFAULT 'Medium',
+    assignment_default_items INTEGER NOT NULL DEFAULT 5,
+    confirm_assignment_delete INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
+
+  // One-time compatibility update: convert untouched legacy defaults from system -> light.
+  db.run(`UPDATE user_settings
+    SET theme_mode = 'light',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE theme_mode = 'system'
+      AND updated_at = created_at`);
 });
 
 module.exports = db;

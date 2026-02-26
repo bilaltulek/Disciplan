@@ -1,4 +1,6 @@
 const complexityValues = ['Easy', 'Medium', 'Hard'];
+const themeModeValues = ['light', 'dark', 'system'];
+const startPageValues = ['dashboard', 'timeline', 'history'];
 
 const validateEmail = (email) => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const validatePassword = (password) => typeof password === 'string' && password.length >= 8 && password.length <= 72;
@@ -118,6 +120,62 @@ const validateTaskUpdate = (req, res, next) => {
   return next();
 };
 
+const validateSettingsPatch = (req, res, next) => {
+  const {
+    theme_mode,
+    start_page,
+    assignment_default_complexity,
+    assignment_default_items,
+    confirm_assignment_delete,
+  } = req.body || {};
+  const details = [];
+
+  const hasAnyField = theme_mode !== undefined
+    || start_page !== undefined
+    || assignment_default_complexity !== undefined
+    || assignment_default_items !== undefined
+    || confirm_assignment_delete !== undefined;
+
+  if (!hasAnyField) {
+    return badRequest(res, [{ field: 'body', message: 'At least one settings field is required.' }]);
+  }
+
+  if (theme_mode !== undefined && !themeModeValues.includes(theme_mode)) {
+    details.push({ field: 'theme_mode', message: 'theme_mode must be light, dark, or system.' });
+  }
+
+  if (start_page !== undefined && !startPageValues.includes(start_page)) {
+    details.push({ field: 'start_page', message: 'start_page must be dashboard, timeline, or history.' });
+  }
+
+  if (assignment_default_complexity !== undefined && !complexityValues.includes(assignment_default_complexity)) {
+    details.push({ field: 'assignment_default_complexity', message: 'assignment_default_complexity must be Easy, Medium, or Hard.' });
+  }
+
+  if (assignment_default_items !== undefined) {
+    const parsedItems = Number.parseInt(assignment_default_items, 10);
+    if (!Number.isInteger(parsedItems) || parsedItems < 1 || parsedItems > 30) {
+      details.push({ field: 'assignment_default_items', message: 'assignment_default_items must be an integer 1-30.' });
+    }
+  }
+
+  if (confirm_assignment_delete !== undefined && typeof confirm_assignment_delete !== 'boolean') {
+    details.push({ field: 'confirm_assignment_delete', message: 'confirm_assignment_delete must be boolean.' });
+  }
+
+  if (details.length) return badRequest(res, details);
+
+  req.body = {
+    theme_mode,
+    start_page,
+    assignment_default_complexity,
+    assignment_default_items: assignment_default_items !== undefined ? Number.parseInt(assignment_default_items, 10) : undefined,
+    confirm_assignment_delete,
+  };
+
+  return next();
+};
+
 module.exports = {
   validateRegister,
   validateLogin,
@@ -125,4 +183,5 @@ module.exports = {
   validateIdParam,
   validateTaskToggle,
   validateTaskUpdate,
+  validateSettingsPatch,
 };
