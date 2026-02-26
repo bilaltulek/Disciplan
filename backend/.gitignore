@@ -1,0 +1,5 @@
+.env
+curl-GET-assignments-id.sh
+curl-GET-assignments-.sh
+curl-POST-assignments.sh
+study_planner.db

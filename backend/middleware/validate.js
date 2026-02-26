@@ -1,0 +1,187 @@
+const complexityValues = ['Easy', 'Medium', 'Hard'];
+const themeModeValues = ['light', 'dark', 'system'];
+const startPageValues = ['dashboard', 'timeline', 'history'];
+
+const validateEmail = (email) => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const validatePassword = (password) => typeof password === 'string' && password.length >= 8 && password.length <= 72;
+
+const badRequest = (res, details) => res.status(400).json({ error: 'Validation failed', details });
+
+const validateRegister = (req, res, next) => {
+  const { email, password, name } = req.body || {};
+  const details = [];
+  if (!validateEmail(email)) details.push({ field: 'email', message: 'Invalid email format.' });
+  if (!validatePassword(password)) details.push({ field: 'password', message: 'Password must be 8-72 chars.' });
+  if (typeof name !== 'string' || name.trim().length < 1 || name.trim().length > 100) details.push({ field: 'name', message: 'Name is required.' });
+  if (details.length) return badRequest(res, details);
+  req.body = { email: email.trim(), password, name: name.trim() };
+  return next();
+};
+
+const validateLogin = (req, res, next) => {
+  const { email, password } = req.body || {};
+  const details = [];
+  if (!validateEmail(email)) details.push({ field: 'email', message: 'Invalid email format.' });
+  if (!validatePassword(password)) details.push({ field: 'password', message: 'Password must be 8-72 chars.' });
+  if (details.length) return badRequest(res, details);
+  req.body = { email: email.trim(), password };
+  return next();
+};
+
+const validateAssignment = (req, res, next) => {
+  const {
+    title, description, complexity, dueDate, totalItems,
+  } = req.body || {};
+  const details = [];
+
+  if (typeof title !== 'string' || title.trim().length < 3 || title.trim().length > 200) details.push({ field: 'title', message: 'Title must be 3-200 chars.' });
+  if (description !== undefined && (typeof description !== 'string' || description.length > 2000)) details.push({ field: 'description', message: 'Description must be <= 2000 chars.' });
+  if (!complexityValues.includes(complexity)) details.push({ field: 'complexity', message: 'Complexity must be Easy, Medium, or Hard.' });
+  if (typeof dueDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) details.push({ field: 'dueDate', message: 'Due date must be YYYY-MM-DD.' });
+
+  const parsedTotalItems = Number.parseInt(totalItems, 10);
+  if (!Number.isInteger(parsedTotalItems) || parsedTotalItems < 1 || parsedTotalItems > 1000) details.push({ field: 'totalItems', message: 'totalItems must be an integer 1-1000.' });
+
+  if (details.length) return badRequest(res, details);
+
+  req.body = {
+    title: title.trim(),
+    description: typeof description === 'string' ? description.trim() : '',
+    complexity,
+    dueDate,
+    totalItems: parsedTotalItems,
+  };
+  return next();
+};
+
+const validateIdParam = (req, res, next) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    return badRequest(res, [{ field: 'id', message: 'id must be a positive integer.' }]);
+  }
+  req.params.id = id;
+  return next();
+};
+
+const validateTaskToggle = (req, res, next) => {
+  if (typeof req.body?.completed !== 'boolean') {
+    return badRequest(res, [{ field: 'completed', message: 'completed must be boolean.' }]);
+  }
+  return next();
+};
+
+const validateTaskUpdate = (req, res, next) => {
+  const {
+    task_description, scheduled_date, estimated_minutes, completed,
+  } = req.body || {};
+  const details = [];
+
+  const hasAnyField = task_description !== undefined
+    || scheduled_date !== undefined
+    || estimated_minutes !== undefined
+    || completed !== undefined;
+
+  if (!hasAnyField) {
+    return badRequest(res, [{ field: 'body', message: 'At least one editable field is required.' }]);
+  }
+
+  if (task_description !== undefined) {
+    if (typeof task_description !== 'string' || task_description.trim().length < 3 || task_description.trim().length > 500) {
+      details.push({ field: 'task_description', message: 'task_description must be 3-500 chars.' });
+    }
+  }
+
+  if (scheduled_date !== undefined) {
+    if (typeof scheduled_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(scheduled_date)) {
+      details.push({ field: 'scheduled_date', message: 'scheduled_date must be YYYY-MM-DD.' });
+    }
+  }
+
+  if (estimated_minutes !== undefined) {
+    const parsed = Number.parseInt(estimated_minutes, 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 720) {
+      details.push({ field: 'estimated_minutes', message: 'estimated_minutes must be an integer 1-720.' });
+    }
+  }
+
+  if (completed !== undefined && typeof completed !== 'boolean') {
+    details.push({ field: 'completed', message: 'completed must be boolean.' });
+  }
+
+  if (details.length) return badRequest(res, details);
+
+  req.body = {
+    task_description: typeof task_description === 'string' ? task_description.trim() : undefined,
+    scheduled_date,
+    estimated_minutes: estimated_minutes !== undefined ? Number.parseInt(estimated_minutes, 10) : undefined,
+    completed,
+  };
+
+  return next();
+};
+
+const validateSettingsPatch = (req, res, next) => {
+  const {
+    theme_mode,
+    start_page,
+    assignment_default_complexity,
+    assignment_default_items,
+    confirm_assignment_delete,
+  } = req.body || {};
+  const details = [];
+
+  const hasAnyField = theme_mode !== undefined
+    || start_page !== undefined
+    || assignment_default_complexity !== undefined
+    || assignment_default_items !== undefined
+    || confirm_assignment_delete !== undefined;
+
+  if (!hasAnyField) {
+    return badRequest(res, [{ field: 'body', message: 'At least one settings field is required.' }]);
+  }
+
+  if (theme_mode !== undefined && !themeModeValues.includes(theme_mode)) {
+    details.push({ field: 'theme_mode', message: 'theme_mode must be light, dark, or system.' });
+  }
+
+  if (start_page !== undefined && !startPageValues.includes(start_page)) {
+    details.push({ field: 'start_page', message: 'start_page must be dashboard, timeline, or history.' });
+  }
+
+  if (assignment_default_complexity !== undefined && !complexityValues.includes(assignment_default_complexity)) {
+    details.push({ field: 'assignment_default_complexity', message: 'assignment_default_complexity must be Easy, Medium, or Hard.' });
+  }
+
+  if (assignment_default_items !== undefined) {
+    const parsedItems = Number.parseInt(assignment_default_items, 10);
+    if (!Number.isInteger(parsedItems) || parsedItems < 1 || parsedItems > 30) {
+      details.push({ field: 'assignment_default_items', message: 'assignment_default_items must be an integer 1-30.' });
+    }
+  }
+
+  if (confirm_assignment_delete !== undefined && typeof confirm_assignment_delete !== 'boolean') {
+    details.push({ field: 'confirm_assignment_delete', message: 'confirm_assignment_delete must be boolean.' });
+  }
+
+  if (details.length) return badRequest(res, details);
+
+  req.body = {
+    theme_mode,
+    start_page,
+    assignment_default_complexity,
+    assignment_default_items: assignment_default_items !== undefined ? Number.parseInt(assignment_default_items, 10) : undefined,
+    confirm_assignment_delete,
+  };
+
+  return next();
+};
+
+module.exports = {
+  validateRegister,
+  validateLogin,
+  validateAssignment,
+  validateIdParam,
+  validateTaskToggle,
+  validateTaskUpdate,
+  validateSettingsPatch,
+};
