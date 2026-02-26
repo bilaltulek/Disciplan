@@ -1,13 +1,11 @@
 # Scripts
 
-## Display all assignments, users, tasks into the console
+## Run Postgres migrations
 
 ```bash
-python verify_db.py ../study_planner.db
+node migrate.js
 ```
 
-## Export all assignments, users, tasks into a CSV file
+## Legacy SQLite inspection scripts (deprecated)
 
-```bash
-python verify_db.py ../study_planner.db --export report.csv
-```
+These remain for historical local debugging only and are not part of the Vercel + Neon deployment path.

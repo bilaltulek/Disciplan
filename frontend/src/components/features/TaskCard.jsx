@@ -65,10 +65,7 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
   };
 
   const handleDeleteClick = () => {
-    const confirmMessage = `Delete assignment "${task.title}" and all mini tasks? This affects Dashboard, Timeline, and History.`;
-    if (window.confirm(confirmMessage)) {
-      onDeleteAssignment?.(task);
-    }
+    onDeleteAssignment?.(task);
   };
 
   return (

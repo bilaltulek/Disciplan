@@ -35,10 +35,24 @@ const readGeminiApiKey = () => {
   return '';
 };
 
+const readDatabaseUrl = () => {
+  const value = process.env.DATABASE_URL;
+  if (value && value.trim().length > 0) {
+    return value.trim();
+  }
+  if (isProduction) {
+    throw new Error('Missing required environment variable: DATABASE_URL');
+  }
+  const fallback = 'postgres://postgres:postgres@localhost:5432/disciplan';
+  console.warn('[config] DATABASE_URL not set. Falling back to local Postgres default.');
+  return fallback;
+};
+
 const config = {
   port: toInt(process.env.PORT, 5000),
   jwtSecret: readJwtSecret(),
   geminiApiKey: readGeminiApiKey(),
+  databaseUrl: readDatabaseUrl(),
   corsOrigins: parseOrigins(process.env.CORS_ORIGINS || 'http://localhost:5173'),
   isProduction,
 };

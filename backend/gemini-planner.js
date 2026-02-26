@@ -3,7 +3,7 @@ const config = require('./config.env');
 const { detectSubject, getTasks, getEstimatedDuration } = require('./task-templates');
 
 const model = config.geminiApiKey
-  ? new GoogleGenerativeAI(config.geminiApiKey).getGenerativeModel({ model: 'gemini-2.5-flash' })
+  ? new GoogleGenerativeAI(config.geminiApiKey).getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
   : null;
 
 const toDateOnly = (date) => date.toISOString().split('T')[0];
