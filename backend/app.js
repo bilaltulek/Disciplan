@@ -256,10 +256,11 @@ app.post('/api/assignments', authenticateToken, validateAssignment, withErrorBou
       dueDate,
       description,
       totalItems,
+      userId: req.user.id,
     });
 
-    if (plan.length > 0) {
-      for (const task of plan) {
+    if (plan.plan.length > 0) {
+      for (const task of plan.plan) {
         // Keep insert simple/readable; volume here is small.
         // eslint-disable-next-line no-await-in-loop
         await db.query(
@@ -269,7 +270,11 @@ app.post('/api/assignments', authenticateToken, validateAssignment, withErrorBou
       }
     }
 
-    return res.status(201).json({ message: 'Assignment created', id: assignmentId });
+    return res.status(201).json({
+      message: 'Assignment created',
+      id: assignmentId,
+      planSource: plan.source,
+    });
   } catch (_aiError) {
     return res.status(500).json({ error: 'Saved, but AI failed.' });
   }

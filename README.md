@@ -50,6 +50,12 @@ Create `backend/.env` (or root `.env`) with:
 DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DB_NAME?sslmode=require
 JWT_SECRET=replace-with-a-long-random-secret-at-least-32-characters
 GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash-lite
+AI_BUDGET_MONTHLY_USD=20
+AI_BUDGET_HARD_STOP_USD=19
+AI_MAX_OUTPUT_TOKENS=600
+AI_THINKING_BUDGET=0
+AI_USER_DAILY_REQUEST_LIMIT=20
 PORT=5000
 CORS_ORIGINS=http://localhost:5173
 NODE_ENV=development
@@ -83,6 +89,12 @@ Required variables:
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `AI_BUDGET_MONTHLY_USD`
+- `AI_BUDGET_HARD_STOP_USD`
+- `AI_MAX_OUTPUT_TOKENS`
+- `AI_THINKING_BUDGET`
+- `AI_USER_DAILY_REQUEST_LIMIT`
 - `PORT`
 - `CORS_ORIGINS`
 - `NODE_ENV`
@@ -150,6 +162,12 @@ npm run migrate
   - `DATABASE_URL`
   - `JWT_SECRET`
   - `GEMINI_API_KEY`
+  - `GEMINI_MODEL`
+  - `AI_BUDGET_MONTHLY_USD`
+  - `AI_BUDGET_HARD_STOP_USD`
+  - `AI_MAX_OUTPUT_TOKENS`
+  - `AI_THINKING_BUDGET`
+  - `AI_USER_DAILY_REQUEST_LIMIT`
   - `CORS_ORIGINS`
   - `NODE_ENV=production`
 
