@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '@/shared/api/client';
 
+const formatDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
 const TaskCard = ({ task, onDeleteAssignment }) => {
   const [plan, setPlan] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,7 +76,7 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
         <CardContent className="pt-6 px-6 flex h-full flex-col">
           <div className="flex justify-between items-start mb-4">
             <span className={`text-xs font-bold uppercase tracking-wider ${mutedTextClass}`}>{task.complexity}</span>
-            <span className={`glass-chip text-xs flex items-center gap-1 px-2 py-1 rounded-full ${mutedTextClass}`}><Calendar className="w-3 h-3" /> {task.due_date}</span>
+            <span className={`glass-chip text-xs flex items-center gap-1 px-2 py-1 rounded-full ${mutedTextClass}`}><Calendar className="w-3 h-3" /> {formatDate(task.due_date)}</span>
           </div>
           <h3 className="font-bold text-lg mb-2 leading-tight text-foreground dark:text-white">{task.title}</h3>
           {totalCount > 0 ? (
@@ -116,7 +118,7 @@ const TaskCard = ({ task, onDeleteAssignment }) => {
                 </button>
                 <div className="flex-1">
                   <p className={`text-sm font-medium ${step.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>{step.task_description}</p>
-                  <div className="flex items-center gap-3 mt-1"><span className="text-xs text-muted-foreground">{step.scheduled_date}</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {step.estimated_minutes}m</span></div>
+                  <div className="flex items-center gap-3 mt-1"><span className="text-xs text-muted-foreground">{formatDate(step.scheduled_date)}</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> {step.estimated_minutes}m</span></div>
                 </div>
               </div>
             ))

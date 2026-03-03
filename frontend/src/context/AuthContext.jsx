@@ -28,6 +28,12 @@ export const AuthProvider = ({ children }) => {
     bootstrap();
   }, []);
 
+  useEffect(() => {
+    const handle = () => { setUser(null); navigate('/login'); };
+    window.addEventListener('auth:unauthorized', handle);
+    return () => window.removeEventListener('auth:unauthorized', handle);
+  }, [navigate]);
+
   const login = async (email, password) => {
     try {
       const data = await apiRequest('/api/login', {

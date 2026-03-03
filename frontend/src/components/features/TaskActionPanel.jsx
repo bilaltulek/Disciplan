@@ -5,6 +5,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+const formatDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+
 const complexityTone = (complexity) => {
   if (complexity === 'Hard') return 'bg-rose-100/70 text-rose-700';
   if (complexity === 'Medium') return 'bg-amber-100/70 text-amber-700';
@@ -46,7 +48,7 @@ const TaskActionPanel = ({
 
       <p className="font-semibold text-foreground mb-2">{task.assignment_title}</p>
       <div className="space-y-1.5 text-sm text-muted-foreground mb-4">
-        <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {task.scheduled_date}</div>
+        <div className="flex items-center gap-2"><Calendar className="w-4 h-4" /> {formatDate(task.scheduled_date)}</div>
         <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> {task.estimated_minutes}m</div>
         <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', complexityTone(task.complexity))}>
           {task.complexity || 'Unknown'}

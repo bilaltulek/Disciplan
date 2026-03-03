@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -19,6 +20,7 @@ const {
 
 const app = express();
 
+app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
@@ -33,30 +35,7 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
-app.use(express.json());
-
-const authAttempts = new Map();
-const AUTH_WINDOW_MS = 15 * 60 * 1000;
-const AUTH_MAX_ATTEMPTS = 20;
-
-const authRateLimiter = (req, res, next) => {
-  const key = req.ip || 'unknown';
-  const now = Date.now();
-  const attempt = authAttempts.get(key) || { count: 0, start: now };
-
-  if (now - attempt.start > AUTH_WINDOW_MS) {
-    authAttempts.set(key, { count: 1, start: now });
-    return next();
-  }
-
-  if (attempt.count >= AUTH_MAX_ATTEMPTS) {
-    return res.status(429).json({ error: 'Too many authentication attempts. Try again later.' });
-  }
-
-  attempt.count += 1;
-  authAttempts.set(key, attempt);
-  return next();
-};
+app.use(express.json({ limit: '10kb' }));
 
 const issueToken = (userId) => jwt.sign({ id: userId }, config.jwtSecret, { expiresIn: '24h' });
 
@@ -109,13 +88,15 @@ const withErrorBoundary = (handler) => async (req, res) => {
   try {
     await handler(req, res);
   } catch (error) {
-    res.status(500).json({ error: error.message || 'Unexpected server error.' });
+    console.error('[server error]', error);
+    const message = config.isProduction ? 'An unexpected error occurred.' : (error.message || 'Unexpected server error.');
+    res.status(500).json({ error: message });
   }
 };
 
-app.post('/api/register', authRateLimiter, validateRegister, withErrorBoundary(async (req, res) => {
+app.post('/api/register', validateRegister, withErrorBoundary(async (req, res) => {
   const { email, password, name } = req.body;
-  const hashedPassword = bcrypt.hashSync(password, 12);
+  const hashedPassword = await bcrypt.hash(password, 12);
 
   try {
     const result = await db.query(
@@ -135,14 +116,14 @@ app.post('/api/register', authRateLimiter, validateRegister, withErrorBoundary(a
   }
 }));
 
-app.post('/api/login', authRateLimiter, validateLogin, withErrorBoundary(async (req, res) => {
+app.post('/api/login', validateLogin, withErrorBoundary(async (req, res) => {
   const { email, password } = req.body;
 
   const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
   const user = result.rows[0];
   if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
 
-  const isValid = bcrypt.compareSync(password, user.password);
+  const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) return res.status(401).json({ error: 'Invalid credentials.' });
 
   const token = issueToken(user.id);
@@ -276,7 +257,7 @@ app.post('/api/assignments', authenticateToken, validateAssignment, withErrorBou
       planSource: plan.source,
     });
   } catch (_aiError) {
-    return res.status(500).json({ error: 'Saved, but AI failed.' });
+    return res.status(201).json({ message: 'Assignment created', id: assignmentId, planSource: 'failed' });
   }
 }));
 
@@ -322,16 +303,6 @@ app.get('/api/assignment/plan/:id', authenticateToken, validateIdParam, withErro
 }));
 
 app.get('/api/timeline', authenticateToken, withErrorBoundary(async (req, res) => {
-  const cleanupSql = `
-    DELETE FROM study_tasks st
-    USING assignments a
-    WHERE st.assignment_id = a.id
-      AND a.user_id = $1
-      AND st.scheduled_date < CURRENT_DATE - INTERVAL '10 days'
-  `;
-
-  await db.query(cleanupSql, [req.user.id]);
-
   const sql = `
     SELECT
       study_tasks.*,

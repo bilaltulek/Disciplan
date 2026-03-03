@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [pendingDeletions, setPendingDeletions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [planWarning, setPlanWarning] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sortBy, setSortBy] = useState('dueSoonest');
   const deletionQueueRef = useRef(new Map());
@@ -87,8 +88,9 @@ const Dashboard = () => {
 
   const handleAddTask = async () => {
     setLoading(true);
+    setPlanWarning('');
     try {
-      await apiRequest('/api/assignments', {
+      const result = await apiRequest('/api/assignments', {
         method: 'POST',
         body: JSON.stringify({
           title: formData.title,
@@ -108,6 +110,9 @@ const Dashboard = () => {
         dueDate: '',
         totalItems: settings.assignment_default_items,
       });
+      if (result.planSource === 'failed') {
+        setPlanWarning('Assignment saved, but the study plan could not be generated. You can add tasks manually.');
+      }
     } catch (error) {
       alert(error.message || 'Failed to create plan.');
     } finally {
@@ -168,6 +173,13 @@ const Dashboard = () => {
       <DashboardNav />
       <main className="container mx-auto p-6 md:p-10">
         <h2 className="text-2xl font-bold text-foreground mb-6">Current Assignments</h2>
+
+        {planWarning && (
+          <div className="mb-5 glass-chip rounded-xl p-3 flex items-center justify-between gap-3 border-amber-300/70 bg-amber-50/60">
+            <p className="text-sm text-amber-800">{planWarning}</p>
+            <button type="button" onClick={() => setPlanWarning('')} className="text-xs text-amber-700 hover:text-amber-900 underline shrink-0">Dismiss</button>
+          </div>
+        )}
 
         {pendingDeletions.length > 0 && (
           <div className="mb-5 space-y-2">
@@ -239,29 +251,29 @@ const Dashboard = () => {
                 <DialogTitle>Create New Study Plan</DialogTitle>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="title" className="text-right">Title</Label>
-                  <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="col-span-3" placeholder="Calculus Midterm" />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Calculus Midterm" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="date" className="text-right">Due Date</Label>
-                  <Input id="date" type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} className="col-span-3" />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="date">Due Date</Label>
+                  <Input id="date" type="date" value={formData.dueDate} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="items" className="text-right">Workload</Label>
-                  <Input id="items" type="number" value={formData.totalItems} onChange={(e) => setFormData({ ...formData, totalItems: e.target.value })} className="col-span-3" placeholder="Num items" />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="items">Workload</Label>
+                  <Input id="items" type="number" value={formData.totalItems} onChange={(e) => setFormData({ ...formData, totalItems: e.target.value })} placeholder="Num items" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="complexity" className="text-right">Difficulty</Label>
-                  <select className="glass-input col-span-3 flex h-10 w-full rounded-xl border px-3 py-2 text-sm" value={formData.complexity} onChange={(e) => setFormData({ ...formData, complexity: e.target.value })}>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="complexity">Difficulty</Label>
+                  <select className="glass-input flex h-10 w-full rounded-xl border px-3 py-2 text-sm" value={formData.complexity} onChange={(e) => setFormData({ ...formData, complexity: e.target.value })}>
                     <option value="Easy">Easy (Review)</option>
                     <option value="Medium">Medium (Standard)</option>
                     <option value="Hard">Hard (Exam Prep)</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-4 items-start gap-4">
-                  <Label htmlFor="desc" className="text-right pt-2">Description</Label>
-                  <Textarea id="desc" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="col-span-3" placeholder="Describe the assignment..." />
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="desc">Description</Label>
+                  <Textarea id="desc" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Describe the assignment..." />
                 </div>
               </div>
               <DialogFooter>

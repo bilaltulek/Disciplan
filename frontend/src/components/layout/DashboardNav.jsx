@@ -46,19 +46,19 @@ const DashboardNav = () => {
             <span className="font-bold text-xl text-foreground tracking-tight">Disciplan</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-1">
+        <div className="flex items-center gap-1">
             {navItems.map((item) => (
-                <Link 
-                    key={item.href} 
+                <Link
+                    key={item.href}
                     to={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                        isActive(item.href) 
-                            ? 'glass-chip text-primary shadow-sm' 
+                    className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        isActive(item.href)
+                            ? 'glass-chip text-primary shadow-sm'
                             : 'text-muted-foreground hover:text-foreground hover:bg-white/45'
                     }`}
                 >
                     <item.icon className="w-4 h-4" />
-                    {item.label}
+                    <span className="hidden sm:inline">{item.label}</span>
                 </Link>
             ))}
         </div>

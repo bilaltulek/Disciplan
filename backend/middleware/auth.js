@@ -4,7 +4,11 @@ const config = require('../config.env');
 const parseCookies = (cookieHeader = '') => cookieHeader.split(';').reduce((acc, part) => {
   const [key, ...rest] = part.trim().split('=');
   if (!key) return acc;
-  acc[key] = decodeURIComponent(rest.join('='));
+  try {
+    acc[key] = decodeURIComponent(rest.join('='));
+  } catch {
+    acc[key] = rest.join('=');
+  }
   return acc;
 }, {});
 
