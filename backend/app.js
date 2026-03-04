@@ -256,7 +256,8 @@ app.post('/api/assignments', authenticateToken, validateAssignment, withErrorBou
       id: assignmentId,
       planSource: plan.source,
     });
-  } catch (_aiError) {
+  } catch (aiError) {
+    console.error('[assignment] plan/task insert failed:', aiError);
     return res.status(201).json({ message: 'Assignment created', id: assignmentId, planSource: 'failed' });
   }
 }));

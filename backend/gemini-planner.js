@@ -79,7 +79,10 @@ INSTRUCTIONS:
    - If it's a "Hard" math assignment, schedule fewer problems per day.
    - If it's a writing assignment, split it into Outline -> Draft -> Review.
    - Ensure the last day is reserved for "Final Review".
-3. Return ONLY a valid JSON array.
+3. Return ONLY a valid JSON array. Each element must have exactly these three fields:
+   - "task_description": a string describing what to do that day
+   - "scheduled_date": a string in YYYY-MM-DD format (e.g. "${today}")
+   - "estimated_minutes": an integer (e.g. 60)
 4. Keep tasks practical and specific.`;
 
   const fallbackPlan = buildFallbackPlan(assignment);
@@ -129,6 +132,15 @@ INSTRUCTIONS:
     const parsed = JSON.parse(text);
     if (!Array.isArray(parsed)) {
       throw new Error('Gemini response JSON is not an array.');
+    }
+
+    const isValidTask = (t) =>
+      typeof t.task_description === 'string' && t.task_description.trim().length > 0
+      && typeof t.scheduled_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.scheduled_date);
+
+    if (!parsed.every(isValidTask)) {
+      console.warn('Gemini returned tasks with missing/invalid fields — using fallback');
+      return { plan: fallbackPlan, source: 'fallback_error' };
     }
 
     const usage = extractUsageMetadata(response);
