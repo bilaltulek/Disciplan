@@ -1,12 +1,32 @@
 node_modules/
 **/node_modules/
 
+# Secrets and local environment configuration. Only redacted templates belong
+# in Git.
 .env
 .env.*
+!.env.example
+!.env.docker.example
 
+# Local service/deployment state and generated output.
+.vercel/
+.trigger/
+.codegraph/
+.tmp/
+coverage/
+frontend/dist/
+test-results/
+playwright-report/
+*.log
 *.db
 *.sqlite
-
 backend/scripts/*.csv
 
+# Private implementation planning and operational handoff evidence. Durable
+# developer documentation belongs under docs/ instead.
+.agent/
+HANDOFF.md
+AGENTS.md
+
 .DS_Store
+Thumbs.db

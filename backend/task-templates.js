@@ -65,6 +65,37 @@ const taskTemplates = {
     ]
   },
 
+  // OPERATING SYSTEMS / SYSTEMS PROGRAMMING STUDY
+  operating_systems: {
+    Easy: [
+      'Review the operating-systems chapter and define its key terms',
+      'Connect the chapter concepts to a small C example',
+      'Complete a short retrieval-practice check',
+      'Review mistakes and summarize weak areas'
+    ],
+    Medium: [
+      'Preview the operating-systems chapter and list its learning objectives',
+      'Refresh the required C and systems-programming prerequisites',
+      'Study process, memory, and concurrency concepts from the chapter',
+      'Trace a small systems-programming example by hand',
+      'Complete focused practice questions or code exercises',
+      'Self-test the key concepts without notes',
+      'Review weak areas and write a concise chapter summary'
+    ],
+    Hard: [
+      'Map the operating-systems chapter objectives to prerequisite knowledge',
+      'Refresh C syntax, memory, and systems-programming fundamentals',
+      'Study process creation, execution, and lifecycle concepts',
+      'Study memory-management and concurrency concepts',
+      'Trace representative systems calls and execution paths',
+      'Implement small focused C experiments for the requested concepts',
+      'Explain observed behavior and identify edge cases',
+      'Complete mixed retrieval and application exercises',
+      'Self-test without notes and correct misconceptions',
+      'Create a concise chapter review sheet'
+    ]
+  },
+
   // ENGLISH/WRITING ASSIGNMENTS
   english: {
     Easy: [
@@ -139,30 +170,30 @@ const taskTemplates = {
   generic: {
     Easy: [
       'Review course notes and materials',
-      'Create outline or structure',
-      'Complete first draft',
-      'Final review and submission'
+      'Identify the required concepts or deliverables',
+      'Complete the main work in a focused session',
+      'Check understanding and review the result'
     ],
     Medium: [
-      'Gather research materials and resources',
-      'Read and take notes on key topics',
-      'Create detailed outline',
-      'Write first draft',
-      'Review and edit content',
-      'Finalize and proofread',
-      'Submit assignment'
+      'Review the assignment goals and available materials',
+      'Identify the main topics, requirements, and dependencies',
+      'Work through the first major section or concept',
+      'Work through the remaining sections or concepts',
+      'Practice or verify the completed work',
+      'Review weak areas and make corrections',
+      'Complete a final requirements check'
     ],
     Hard: [
-      'Conduct initial research and literature review',
-      'Organize and categorize sources',
-      'Create detailed project plan',
+      'Analyze the goals, requirements, and prerequisite knowledge',
+      'Gather and organize the necessary learning resources',
+      'Create a detailed sequence of milestones',
       'Work on first section/component',
       'Work on second section/component',
       'Work on third section/component',
-      'Integration and testing',
-      'Comprehensive review and editing',
-      'Get feedback and revise',
-      'Final polish and submission'
+      'Integrate and verify the completed work',
+      'Complete retrieval practice or a requirements review',
+      'Correct weak areas and unresolved issues',
+      'Complete a final quality check'
     ]
   }
 };
@@ -178,6 +209,11 @@ const durationEstimates = {
     Easy: [45, 60, 90],
     Medium: [90, 120, 150],
     Hard: [120, 180, 240]
+  },
+  operating_systems: {
+    Easy: [30, 45, 60],
+    Medium: [45, 60, 90],
+    Hard: [60, 90, 120]
   },
   english: {
     Easy: [30, 45, 60],
@@ -197,25 +233,108 @@ const durationEstimates = {
 };
 
 // Helper function to get subject from assignment title/description
+const matchesAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
+
+const subjectPatterns = {
+  operating_systems: [
+    /\boperating systems?\b/i, /\bos\b/i, /\bunix\b/i, /\blinux\b/i,
+    /\bsystems programming\b/i, /\bfork\s*\(\s*\)?/i, /\bsystem calls?\b/i,
+    /\bprocess(?:es)?\b/i, /\bthreads?\b/i, /\bsynchroni[sz]ation\b/i,
+  ],
+  mathematics: [
+    /\bmath(?:ematics)?\b/i, /\bcalculus\b/i, /\balgebra\b/i, /\bgeometry\b/i,
+    /\bstatistics\b/i, /\btheorems?\b/i, /\bproofs?\b/i, /\bequations?\b/i,
+    /\blinear algebra\b/i,
+  ],
+  computer_science: [
+    /\bprogramming\b/i, /\bcoding\b/i, /\balgorithms?\b/i, /\bsoftware\b/i,
+    /\bdatabases?\b/i, /\bjava\b/i, /\bpython\b/i, /\bjavascript\b/i,
+    /\bhtml\b/i, /\bcss\b/i, /\bc\s+(?:syntax|language|programming|concepts?)\b/i,
+    /\bpointers?\b/i,
+  ],
+  english: [
+    /\bessays?\b/i, /\bpapers?\b/i, /\bliterature\b/i, /\bwriting\b/i,
+    /\bcomposition\b/i, /\bnovels?\b/i, /\bpoems?\b/i, /\bshakespeare\b/i,
+  ],
+  physics: [
+    /\bphysics\b/i, /\bmechanics\b/i, /\bthermodynamics\b/i, /\bquantum\b/i,
+    /\bforces?\b/i, /\benergy\b/i, /\bmotion\b/i, /\belectricity\b/i,
+    /\bmagnetism\b/i,
+  ],
+};
+
+const workTypePatterns = {
+  writing: [/\bessay\b/i, /\bpaper\b/i, /\breport\b/i, /\bthesis\b/i, /\bdraft\b/i, /\bwrite\b/i],
+  implementation: [/\bimplement\b/i, /\bbuild\b/i, /\bcreate\s+(?:an?\s+)?(?:app|program|website)\b/i, /\bcode\b/i, /\bdebug\b/i],
+  problem_set: [/\bproblem set\b/i, /\bhomework problems?\b/i, /\bsolve\b/i, /\bexercises?\b/i],
+  study_review: [/\bchapters?\b/i, /\bstudy\b/i, /\breview\b/i, /\brefresh\b/i, /\blearn\b/i, /\bunderstand\b/i, /\bexam\b/i, /\bquiz\b/i, /\bread(?:ing)?\b/i],
+};
+
+const focusTopicPatterns = [
+  { label: 'operating-systems foundations', patterns: [/\boperating systems?\b/i, /\bos\b/i] },
+  { label: 'C syntax', patterns: [/\bc\s+syntax\b/i] },
+  { label: 'C concepts for operating systems', patterns: [/\bc\s+concepts?(?:\s+for\s+(?:operating systems?|os))?\b/i] },
+  { label: 'pointers', patterns: [/\bpointers?\b/i] },
+  { label: 'fork()', patterns: [/\bfork\s*(?:\(\s*\))?/i] },
+  { label: 'processes', patterns: [/\bprocess(?:es)?\b/i] },
+  { label: 'threads', patterns: [/\bthreads?\b/i] },
+  { label: 'memory management', patterns: [/\bmemory(?:\s+management)?\b/i] },
+  { label: 'synchronization', patterns: [/\bsynchroni[sz]ation\b/i] },
+  { label: 'concurrency', patterns: [/\bconcurren(?:cy|t)\b/i] },
+  { label: 'Unix/Linux', patterns: [/\bunix\b/i, /\blinux\b/i] },
+];
+
 function detectSubject(title, description) {
-  const text = `${title} ${description || ''}`.toLowerCase();
-  
-  // Keywords for each subject
-  const subjectKeywords = {
-    mathematics: ['math', 'calculus', 'algebra', 'geometry', 'statistics', 'theorem', 'proof', 'equation', 'problem set', 'linear algebra'],
-    computer_science: ['programming', 'code', 'algorithm', 'software', 'app', 'web', 'database', 'java', 'python', 'javascript', 'css', 'html'],
-    english: ['essay', 'paper', 'literature', 'analysis', 'writing', 'composition', 'novel', 'poem', 'author', 'shakespeare'],
-    physics: ['physics', 'mechanics', 'thermodynamics', 'quantum', 'force', 'energy', 'motion', 'electricity', 'magnetism']
-  };
-
-  // Check for keyword matches
-  for (const [subject, keywords] of Object.entries(subjectKeywords)) {
-    if (keywords.some(keyword => text.includes(keyword))) {
-      return subject;
-    }
+  const text = `${title || ''} ${description || ''}`;
+  for (const subject of ['operating_systems', 'mathematics', 'physics', 'english', 'computer_science']) {
+    if (matchesAny(text, subjectPatterns[subject])) return subject;
   }
-
   return 'generic';
+}
+
+function detectWorkType(title, description) {
+  const text = `${title || ''} ${description || ''}`;
+  for (const workType of ['writing', 'implementation', 'problem_set', 'study_review']) {
+    if (matchesAny(text, workTypePatterns[workType])) return workType;
+  }
+  return 'general_project';
+}
+
+function extractFocusTopics(title, description, limit = 8) {
+  const text = `${title || ''} ${description || ''}`;
+  return focusTopicPatterns
+    .filter(({ patterns }) => matchesAny(text, patterns))
+    .map(({ label }) => label)
+    .slice(0, Math.max(0, Math.min(limit, 8)));
+}
+
+function buildStudyReviewTasks({ title, subject, focusTopics, complexity }) {
+  const boundedTopics = focusTopics.slice(0, complexity === 'Easy' ? 3 : complexity === 'Hard' ? 8 : 6);
+  const topicSummary = boundedTopics.length ? boundedTopics.join(', ') : 'the requested concepts';
+  const tasks = [];
+  if (title) tasks.push(`Preview ${title} and map its learning objectives to ${topicSummary}`);
+  tasks.push(...boundedTopics.map((topic) => `Review and practice ${topic} with notes and a small worked example`));
+  if (subject === 'operating_systems') {
+    tasks.push('Trace how the requested operating-systems concepts behave in a small C example');
+  } else {
+    tasks.push('Complete focused retrieval practice on the requested concepts');
+  }
+  tasks.push(`Self-test ${topicSummary} without notes, correct mistakes, and summarize the weakest concepts`);
+  return [...new Set(tasks)];
+}
+
+function getAssignmentTasks({ title, description, complexity = 'Medium' }) {
+  const subject = detectSubject(title, description);
+  const workType = detectWorkType(title, description);
+  const focusTopics = extractFocusTopics(title, description);
+  if (workType === 'study_review') {
+    return {
+      subject, workType, focusTopics,
+      tasks: buildStudyReviewTasks({ title, subject, focusTopics, complexity }),
+    };
+  }
+  const templateSubject = workType === 'writing' ? 'english' : subject;
+  return { subject, workType, focusTopics, tasks: getTasks(templateSubject, complexity) };
 }
 
 // Get tasks for a given subject and complexity
@@ -236,13 +355,16 @@ function getEstimatedDuration(subject, complexity) {
   const durations = durationEstimates[normalizedSubject] || durationEstimates.generic;
   const options = durations[complexity];
   
-  return options[Math.floor(Math.random() * options.length)];
+  return options[Math.floor(options.length / 2)];
 }
 
 module.exports = {
   taskTemplates,
   durationEstimates,
   detectSubject,
+  detectWorkType,
+  extractFocusTopics,
+  getAssignmentTasks,
   getTasks,
   getEstimatedDuration
 };

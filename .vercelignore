@@ -1,0 +1,44 @@
+# Local metadata, credentials, and generated output
+.git/
+.github/
+.agent/
+.codegraph/
+.trigger/
+.vercel/
+.tmp/
+.env
+.env.*
+node_modules/
+**/node_modules/
+coverage/
+test-results/
+playwright-report/
+frontend/dist/
+*.log
+*.db
+*.sqlite
+
+# Developer-only documentation and local/container tooling
+AGENTS.md
+HANDOFF.md
+docs/
+tests/
+Dockerfile.*
+compose.yaml
+docker/
+playwright.config.ts
+tsconfig.worker.json
+vitest.config.ts
+
+# Test, evaluation, and local validation sources are not required by the
+# Vercel request/UI runtime.
+backend/**/*.test.*
+backend/integration/
+backend/evals/
+backend/scripts/deploy-preview-runtime.js
+backend/scripts/set-validation-fault.js
+backend/scripts/validate-preview-live.js
+backend/scripts/validation-accounts.js
+trigger/
+trigger.config.ts
+tsconfig.trigger.json

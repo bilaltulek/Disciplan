@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.backend.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./build"
+  },
+  "include": ["backend/agent-worker.ts", "backend/agent-graph.ts", "backend/agent-types.ts"]
+}

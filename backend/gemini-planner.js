@@ -1,178 +1,41 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const config = require('./config.env');
-const {
-  STATUS,
-  extractUsageMetadata,
-  estimateCostMicroUsd,
-  getBudgetGuardDecision,
-  recordAiUsageEvent,
-} = require('./ai-usage');
-const { detectSubject, getTasks, getEstimatedDuration } = require('./task-templates');
+const { getAssignmentTasks } = require('./task-templates');
+const { allocateTasks } = require('./domain/scheduler');
+const { todayInTimezone } = require('./domain/date-only');
 
-const model = config.geminiApiKey
-  ? new GoogleGenerativeAI(config.geminiApiKey).getGenerativeModel({ model: config.geminiModel })
-  : null;
-
-const safeRecordAiUsageEvent = async (payload) => {
-  try {
-    await recordAiUsageEvent(payload);
-  } catch (error) {
-    console.error('Failed to record AI usage event:', error.message);
-  }
-};
-
-const toDateOnly = (date) => date.toISOString().split('T')[0];
-
-const normalizeDate = (rawDate) => {
-  const parsed = new Date(rawDate);
-  if (Number.isNaN(parsed.getTime())) {
-    const fallback = new Date();
-    fallback.setDate(fallback.getDate() + 7);
-    return fallback;
-  }
-  return parsed;
-};
-
+// Compatibility module for deterministic planning. Production model access
+// lives exclusively behind backend/agents/model-gateway.ts.
 const buildFallbackPlan = (assignment) => {
-  const today = new Date();
-  const due = normalizeDate(assignment.dueDate);
-  const dueAtLeastTomorrow = new Date(Math.max(due.getTime(), today.getTime() + 24 * 60 * 60 * 1000));
-
-  const subject = detectSubject(assignment.title, assignment.description);
-  const templateTasks = getTasks(subject, assignment.complexity || 'Medium');
-  const daySpan = Math.max(
-    1,
-    Math.ceil((dueAtLeastTomorrow.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)),
-  );
-
-  return templateTasks.map((taskDescription, index) => {
-    const dayOffset = Math.min(daySpan, index + 1);
-    const scheduledDate = new Date(today);
-    scheduledDate.setDate(today.getDate() + dayOffset);
-    return {
-      task_description: taskDescription,
-      scheduled_date: toDateOnly(scheduledDate),
-      estimated_minutes: getEstimatedDuration(subject, assignment.complexity || 'Medium'),
-    };
+  const classification = getAssignmentTasks({
+    title: assignment.title,
+    description: assignment.description,
+    complexity: assignment.complexity || 'Medium',
+  });
+  const profile = assignment.planningProfile;
+  const timezone = profile?.timezone || 'UTC';
+  const startDate = assignment.startDate || todayInTimezone(timezone);
+  return allocateTasks({
+    descriptions: classification.tasks,
+    startDate,
+    dueDate: assignment.dueDate,
+    profile,
+    existingLoad: assignment.existingLoad,
   });
 };
 
-async function generateStudyPlan(assignment) {
-  const {
-    title, description, complexity, dueDate, totalItems, userId,
-  } = assignment;
-  const today = new Date().toISOString().split('T')[0];
+// Retained for the reviewer data-boundary regression test. It does not invoke
+// a model and is not part of the active graph prompt bundle.
+const buildReviewPrompt = ({ assignment, tasks, validationIssues }) => {
+  const reviewInput = {
+    assignment: {
+      title: assignment.title,
+      complexity: assignment.complexity,
+      dueDate: assignment.dueDate,
+      totalItems: assignment.totalItems,
+    },
+    tasks,
+    deterministicIssues: validationIssues,
+  };
+  return `Review ONLY this structured plan data. Do not add user data or perform actions.\n\n${JSON.stringify(reviewInput)}`;
+};
 
-  const prompt = `You are an expert academic planner. Create a daily study schedule.
-
-CONTEXT:
-- Assignment: "${title}"
-- Description: "${description}"
-- Complexity: ${complexity} (1-5)
-- Total Workload: ${totalItems} items (problems, pages, or sections)
-- Start Date: ${today}
-- Due Date: ${dueDate}
-
-INSTRUCTIONS:
-1. Calculate the number of days available between today and the due date.
-2. Break the workload down intelligently.
-   - If it's a "Hard" math assignment, schedule fewer problems per day.
-   - If it's a writing assignment, split it into Outline -> Draft -> Review.
-   - Ensure the last day is reserved for "Final Review".
-3. Return ONLY a valid JSON array. Each element must have exactly these three fields:
-   - "task_description": a string describing what to do that day
-   - "scheduled_date": a string in YYYY-MM-DD format (e.g. "${today}")
-   - "estimated_minutes": an integer (e.g. 60)
-4. Keep tasks practical and specific.`;
-
-  const fallbackPlan = buildFallbackPlan(assignment);
-
-  if (!model) {
-    return { plan: fallbackPlan, source: 'fallback_error' };
-  }
-
-  try {
-    const guardDecision = await getBudgetGuardDecision(userId);
-    if (!guardDecision.allow) {
-      await safeRecordAiUsageEvent({
-        userId,
-        endpoint: '/api/assignments',
-        model: config.geminiModel,
-        status: guardDecision.status,
-      });
-      return { plan: fallbackPlan, source: 'fallback_limit' };
-    }
-  } catch (error) {
-    console.error('AI budget guard failed:', error.message);
-    return { plan: fallbackPlan, source: 'fallback_error' };
-  }
-
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: config.aiMaxOutputTokens,
-        thinkingConfig: {
-          thinkingBudget: config.aiThinkingBudget,
-        },
-      },
-    });
-    const response = await result.response;
-    let text = response.text();
-
-    const firstBracket = text.indexOf('[');
-    const lastBracket = text.lastIndexOf(']');
-
-    if (firstBracket === -1 || lastBracket === -1) {
-      throw new Error('Gemini did not return a valid JSON array.');
-    }
-
-    text = text.substring(firstBracket, lastBracket + 1);
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) {
-      throw new Error('Gemini response JSON is not an array.');
-    }
-
-    const isValidTask = (t) =>
-      typeof t.task_description === 'string' && t.task_description.trim().length > 0
-      && typeof t.scheduled_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.scheduled_date);
-
-    if (!parsed.every(isValidTask)) {
-      console.warn('Gemini returned tasks with missing/invalid fields — using fallback');
-      return { plan: fallbackPlan, source: 'fallback_error' };
-    }
-
-    const usage = extractUsageMetadata(response);
-    const estimatedCost = estimateCostMicroUsd({
-      model: config.geminiModel,
-      promptTokens: usage.promptTokens,
-      outputTokens: usage.outputTokens,
-    });
-    await safeRecordAiUsageEvent({
-      userId,
-      endpoint: '/api/assignments',
-      model: config.geminiModel,
-      promptTokens: usage.promptTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.totalTokens,
-      estimatedInputMicroUsd: estimatedCost.estimatedInputMicroUsd,
-      estimatedOutputMicroUsd: estimatedCost.estimatedOutputMicroUsd,
-      estimatedTotalMicroUsd: estimatedCost.estimatedTotalMicroUsd,
-      status: STATUS.allowed,
-    });
-
-    return { plan: parsed, source: 'gemini' };
-  } catch (error) {
-    console.error('Gemini Plan Generation Failed:', error);
-    await safeRecordAiUsageEvent({
-      userId,
-      endpoint: '/api/assignments',
-      model: config.geminiModel,
-      status: STATUS.error,
-    });
-    return { plan: fallbackPlan, source: 'fallback_error' };
-  }
-}
-
-module.exports = { generateStudyPlan };
+module.exports = { buildFallbackPlan, buildReviewPrompt };

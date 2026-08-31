@@ -1,11 +1,39 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
+const crypto = require('crypto');
+const db = require('../migration-db');
+const {
+  MIGRATION_REQUIREMENTS,
+  classifyMigrationState,
+} = require('./migration-status');
 
 const migrationsDir = path.resolve(__dirname, '../migrations');
 
-async function runMigrations() {
-  const files = fs.readdirSync(migrationsDir)
+const checksum = (sql) => crypto.createHash('sha256').update(sql).digest('hex');
+
+async function readAvailableObjects(client) {
+  const [tables, columns] = await Promise.all([
+    client.query("SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema IN ('public', 'agent_memory')"),
+    client.query("SELECT table_schema, table_name, column_name FROM information_schema.columns WHERE table_schema IN ('public', 'agent_memory')"),
+  ]);
+  return new Set([
+    ...tables.rows.map((row) => `table:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}`),
+    ...columns.rows.map((row) => `column:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}.${row.column_name}`),
+  ]);
+}
+
+async function ensureLedger(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename TEXT PRIMARY KEY,
+      checksum TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function runMigrations({ client: suppliedClient, directory = migrationsDir } = {}) {
+  const files = fs.readdirSync(directory)
     .filter((name) => name.endsWith('.sql'))
     .sort();
 
@@ -14,23 +42,73 @@ async function runMigrations() {
     return;
   }
 
-  const client = await db.connect();
+  const client = suppliedClient || await db.connect();
   try {
+    await client.query("SELECT pg_advisory_lock(hashtext('disciplan-schema-migrations'))");
+    await ensureLedger(client);
+    const appliedResult = await client.query('SELECT filename, checksum FROM schema_migrations');
+    const applied = new Map(appliedResult.rows.map((row) => [row.filename, row.checksum]));
+
     for (const file of files) {
-      const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+      const sql = fs.readFileSync(path.join(directory, file), 'utf8');
+      const digest = checksum(sql);
+      if (applied.has(file)) {
+        if (applied.get(file) !== digest) {
+          throw new Error(`Applied migration was modified: ${file}`);
+        }
+        console.log(`Already applied: ${file}`);
+        continue;
+      }
+
+      const requirements = MIGRATION_REQUIREMENTS[file];
+      if (requirements) {
+        const states = classifyMigrationState(await readAvailableObjects(client));
+        if (states[file].state === 'partial') {
+          throw new Error(`Partial migration state detected for ${file}; use an additive corrective migration.`);
+        }
+        if (states[file].state === 'complete') {
+          await client.query(
+            'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
+            [file, digest],
+          );
+          console.log(`Recorded existing migration: ${file}`);
+          continue;
+        }
+      }
+
       await client.query('BEGIN');
-      await client.query(sql);
-      await client.query('COMMIT');
-      console.log(`Applied migration: ${file}`);
+      try {
+        await client.query(sql);
+        await client.query(
+          'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
+          [file, digest],
+        );
+        await client.query('COMMIT');
+        console.log(`Applied migration: ${file}`);
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
     }
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('Migration failed:', error.message);
-    process.exitCode = 1;
+    if (!suppliedClient) process.exitCode = 1;
+    else throw error;
   } finally {
-    client.release();
-    await db.end();
+    try {
+      await client.query("SELECT pg_advisory_unlock(hashtext('disciplan-schema-migrations'))");
+    } finally {
+      if (!suppliedClient) {
+        client.release();
+        await db.end();
+      }
+    }
   }
 }
 
-runMigrations();
+if (require.main === module) runMigrations();
+
+module.exports = {
+  checksum,
+  runMigrations,
+};

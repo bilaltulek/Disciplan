@@ -72,13 +72,14 @@ const validateTaskToggle = (req, res, next) => {
 
 const validateTaskUpdate = (req, res, next) => {
   const {
-    task_description, scheduled_date, estimated_minutes, completed,
+    task_description, scheduled_date, estimated_minutes, actual_minutes, completed,
   } = req.body || {};
   const details = [];
 
   const hasAnyField = task_description !== undefined
     || scheduled_date !== undefined
     || estimated_minutes !== undefined
+    || actual_minutes !== undefined
     || completed !== undefined;
 
   if (!hasAnyField) {
@@ -104,6 +105,13 @@ const validateTaskUpdate = (req, res, next) => {
     }
   }
 
+  if (actual_minutes !== undefined && actual_minutes !== null) {
+    const parsed = Number.parseInt(actual_minutes, 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+      details.push({ field: 'actual_minutes', message: 'actual_minutes must be null or an integer 1-1440.' });
+    }
+  }
+
   if (completed !== undefined && typeof completed !== 'boolean') {
     details.push({ field: 'completed', message: 'completed must be boolean.' });
   }
@@ -114,6 +122,7 @@ const validateTaskUpdate = (req, res, next) => {
     task_description: typeof task_description === 'string' ? task_description.trim() : undefined,
     scheduled_date,
     estimated_minutes: estimated_minutes !== undefined ? Number.parseInt(estimated_minutes, 10) : undefined,
+    actual_minutes: actual_minutes === null ? null : actual_minutes !== undefined ? Number.parseInt(actual_minutes, 10) : undefined,
     completed,
   };
 
