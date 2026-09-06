@@ -3,12 +3,12 @@ import {
 } from 'langchain';
 import { z } from 'zod';
 import { PlanDraftSchema, type PlanDraft } from '../../shared/contracts.js';
-import type { DisciplanState, IntentEnvelope, ReviewResult } from './graph-state.js';
+import type { AssistantResponse, DisciplanState, IntentEnvelope, ReviewResult } from './graph-state.js';
 import type { ModelGateway } from './model-gateway.js';
 import { defineGovernedTool, type Capability, type ToolAuditEvent, type ToolContext } from './tool-registry.js';
 
 const { PROMPTS } = require('./runtime-registry.js') as {
-  PROMPTS: Record<'coordinator' | 'planner' | 'repair' | 'reviewer', string>;
+  PROMPTS: Record<'coordinator' | 'planner' | 'repair' | 'reviewer' | 'tutor', string>;
 };
 
 const IntentEnvelopeSchema = z.object({
@@ -38,6 +38,17 @@ const IntentEnvelopeSchema = z.object({
     key: z.enum(['planning_style', 'task_description_style', 'study_preferences']),
     value: z.string().trim().min(1).max(500),
   }).optional(),
+  useGroundedResources: z.boolean().optional(),
+});
+
+const TutorResponseSchema = z.object({
+  kind: z.enum(['answer', 'tutor', 'proposal']),
+  answer: z.string().trim().min(1).max(8_000),
+  studyTips: z.array(z.string().trim().min(1).max(500)).max(8),
+  suggestedActions: z.array(z.object({
+    label: z.string().trim().min(1).max(80),
+    prompt: z.string().trim().min(1).max(500),
+  })).max(5),
 });
 
 const ReviewResultSchema = z.object({
@@ -77,6 +88,8 @@ const untrustedPayload = (state: DisciplanState) => JSON.stringify({
   collectedContext: state.collectedContext,
   conversationSummary: state.conversationSummary,
   confirmedMemories: state.confirmedMemories,
+  availableAssignments: state.availableAssignments,
+  availableTasks: state.availableTasks,
   assignment: state.assignment,
   planningProfile: state.planningProfile,
   planningDate: state.planningDate,
@@ -90,11 +103,12 @@ const untrustedPayload = (state: DisciplanState) => JSON.stringify({
   semanticIssues: state.semanticReview?.issues ?? [],
 });
 
-type SpecialistRole = 'coordinator' | 'planner' | 'repair' | 'reviewer';
+type SpecialistRole = 'coordinator' | 'planner' | 'repair' | 'reviewer' | 'tutor';
 type SpecialistOptions = {
   maxModelCalls?: number;
   maxToolCalls?: number;
   auditTool?: (event: ToolAuditEvent) => Promise<void> | void;
+  gatewayForRole?: (role: SpecialistRole) => ModelGateway;
 };
 type SharedBudget = { modelCallsRemaining: number; toolCallsRemaining: number };
 
@@ -109,6 +123,8 @@ export const createReadTools = ({
 }) => {
   const capabilities = new Set<Capability>(role === 'repair'
     ? ['plan:read', 'schedule:read', 'conflicts:read']
+    : role === 'tutor'
+      ? ['assignment:read', 'schedule:read', 'progress:read']
     : role === 'reviewer'
         ? ['draft:write']
         : []);
@@ -167,6 +183,22 @@ export const createReadTools = ({
       name: 'get_published_plan',
       description: 'Read the authorized published plan and immutable completed logical task IDs before proposing a repair.',
       schema: z.object({}),
+    }));
+  }
+  if (capabilities.has('assignment:read')) {
+    const inputSchema = z.object({ assignmentId: z.number().int().positive().optional() });
+    const governed = defineGovernedTool({
+      name: 'get_student_work_context', capability: 'assignment:read', inputSchema,
+      outputSchema: z.object({ assignments: z.array(z.unknown()), tasks: z.array(z.unknown()) }),
+      execute: async (_context, input) => ({
+        assignments: input.assignmentId ? state.availableAssignments.filter((item) => item.id === input.assignmentId) : state.availableAssignments,
+        tasks: input.assignmentId ? state.availableTasks.filter((item) => item.assignmentId === input.assignmentId) : state.availableTasks,
+      }), audit,
+    });
+    tools.push(tool(wrap(governed), {
+      name: 'get_student_work_context',
+      description: 'Read the authenticated student own recent assignments and tasks to resolve references. Never use an ID not returned here.',
+      schema: inputSchema,
     }));
   }
   return tools;
@@ -278,9 +310,10 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
     toolCallsRemaining: options.maxToolCalls ?? 12,
   };
   const auditTool = options.auditTool ?? (() => undefined);
+  const selectedGateway = (role: SpecialistRole) => options.gatewayForRole?.(role) ?? gateway;
   return ({
   coordinate: (state: DisciplanState): Promise<IntentEnvelope> => invokeStructured({
-    gateway,
+    gateway: selectedGateway('coordinator'),
     role: 'coordinator',
     schema: IntentEnvelopeSchema,
     state,
@@ -289,15 +322,15 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
     auditTool,
   }),
   createPlan: async (state: DisciplanState): Promise<PlanDraft> => normalizeModelPlanDraft(await invokeStructured({
-    gateway, role: 'planner', schema: ModelInitialPlanDraftSchema, state,
+    gateway: selectedGateway('planner'), role: 'planner', schema: ModelInitialPlanDraftSchema, state,
     systemPrompt: PROMPTS.planner, budget, auditTool,
   })),
   repairPlan: async (state: DisciplanState): Promise<PlanDraft> => normalizeModelPlanDraft(await invokeStructured({
-    gateway, role: 'repair', schema: ModelRepairPlanDraftSchema, state,
+    gateway: selectedGateway('repair'), role: 'repair', schema: ModelRepairPlanDraftSchema, state,
     systemPrompt: PROMPTS.repair, budget, auditTool,
   })),
   reviewPlan: (state: DisciplanState): Promise<ReviewResult> => invokeStructured({
-    gateway,
+    gateway: selectedGateway('reviewer'),
     role: 'reviewer',
     schema: ReviewResultSchema,
     state,
@@ -305,6 +338,10 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
     budget,
     auditTool,
   }),
+  tutor: (state: DisciplanState): Promise<AssistantResponse> => invokeStructured({
+    gateway: selectedGateway('tutor'), role: 'tutor', schema: TutorResponseSchema, state,
+    systemPrompt: PROMPTS.tutor, budget, auditTool,
+  }).then((response) => ({ ...response, citations: [] })),
   });
 };
 
@@ -319,5 +356,5 @@ const normalizeModelPlanDraft = (value: z.infer<typeof ModelInitialPlanDraftSche
 });
 
 export {
-  IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema, ReviewResultSchema, normalizeModelPlanDraft,
+  IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema, ReviewResultSchema, TutorResponseSchema, normalizeModelPlanDraft,
 };

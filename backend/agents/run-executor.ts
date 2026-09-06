@@ -4,6 +4,7 @@ import { Command } from '@langchain/langgraph';
 import type { Pool, PoolClient } from 'pg';
 import { createInitialGraphState, type DisciplanState } from './graph-state.js';
 import { GeminiModelGateway } from './model-gateway.js';
+import { groundTutorResources } from './grounded-resources.js';
 import { createSpecialists } from './specialists.js';
 import { createSupervisorGraph, type SupervisorDependencies } from './supervisor-graph.js';
 import { fallbackDraft } from './fallback-planner.js';
@@ -185,14 +186,12 @@ export async function executeGenericAgentRun(
       reservedRequestCount: config.aiAgentMaxModelCalls,
     });
 
-    const gateway = new GeminiModelGateway({
-      apiKey: reservationActive ? config.geminiApiKey : '',
-      modelName: config.geminiModel,
-      maxOutputTokens: config.aiMaxOutputTokens,
-      thinkingBudget: config.aiThinkingBudget,
+    const createGateway = (modelName: string) => new GeminiModelGateway({
+      apiKey: reservationActive ? config.geminiApiKey : '', modelName,
+      maxOutputTokens: config.aiMaxOutputTokens, thinkingBudget: config.aiThinkingBudget,
       onUsage: async ({ role, actorUserId, usage }) => {
         const estimated = budget.estimateCostMicroUsd({
-          model: config.geminiModel,
+          model: modelName,
           promptTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
         });
@@ -200,7 +199,7 @@ export async function executeGenericAgentRun(
           await budget.recordAiUsageEvent({
             userId: actorUserId,
             endpoint: `/api/agent-runs/${role}`,
-            model: config.geminiModel,
+            model: modelName,
             promptTokens: usage.inputTokens,
             outputTokens: usage.outputTokens,
             totalTokens: usage.totalTokens,
@@ -217,7 +216,11 @@ export async function executeGenericAgentRun(
         }
       },
     });
-    const specialists = reservationActive && config.geminiApiKey ? createSpecialists(gateway, {
+    const routerGateway = createGateway(config.geminiRouterModel);
+    const agentGateway = createGateway(config.geminiAgentModel);
+    const searchGateway = createGateway(config.geminiSearchModel);
+    const specialists = reservationActive && config.geminiApiKey ? createSpecialists(routerGateway, {
+      gatewayForRole: (role) => role === 'coordinator' || role === 'reviewer' ? routerGateway : agentGateway,
       maxModelCalls: config.aiAgentMaxModelCalls,
       maxToolCalls: config.aiAgentMaxToolCalls,
       auditTool: async (event) => {
@@ -233,7 +236,7 @@ export async function executeGenericAgentRun(
     await db.query(
       `UPDATE agent_runs SET model_provider=$2,model_name=$3,updated_at=CURRENT_TIMESTAMP
        WHERE id=$1 AND status='running'`,
-      [runId, specialists ? gateway.provider : null, specialists ? gateway.modelName : null],
+      [runId, specialists ? agentGateway.provider : null, specialists ? config.geminiAgentModel : null],
     );
     const planVersions = new PlanVersionService(db, validatePlan);
     const profile = {
@@ -253,7 +256,7 @@ export async function executeGenericAgentRun(
       )
       : { rows: [] };
     const existingLoad = Object.fromEntries(loadResult.rows.map((row) => [row.scheduled_date, Number(row.minutes)]));
-    const [conversationResult, memoriesResult] = await Promise.all([
+    const [conversationResult, memoriesResult, assignmentsResult, tasksResult] = await Promise.all([
       context.thread_id
         ? db.query(
           `SELECT id,role,content FROM agent_messages
@@ -265,6 +268,19 @@ export async function executeGenericAgentRun(
       db.query(
         `SELECT memory_key,memory_value FROM user_preference_memories
          WHERE user_id=$1 AND status='confirmed' ORDER BY updated_at DESC LIMIT 20`,
+        [context.user_id],
+      ),
+      db.query(
+        `SELECT id,title,LEFT(description,1000) AS description,complexity,due_date
+         FROM assignments WHERE user_id=$1 ORDER BY created_at DESC LIMIT 20`,
+        [context.user_id],
+      ),
+      db.query(
+        `SELECT st.id,st.assignment_id,LEFT(st.task_description,500) AS task_description,
+                st.scheduled_date,st.completed
+         FROM study_tasks st JOIN assignments a ON a.id=st.assignment_id
+         WHERE a.user_id=$1 AND st.archived_at IS NULL
+         ORDER BY st.scheduled_date ASC,st.id ASC LIMIT 60`,
         [context.user_id],
       ),
     ]);
@@ -286,6 +302,13 @@ export async function executeGenericAgentRun(
       row.memory_key,
       typeof row.memory_value === 'string' ? row.memory_value : JSON.stringify(row.memory_value),
     ]));
+    const availableAssignments = assignmentsResult.rows.map((row) => ({
+      id: row.id, title: row.title, description: row.description || '', dueDate: row.due_date, complexity: row.complexity,
+    }));
+    const availableTasks = tasksResult.rows.map((row) => ({
+      id: row.id, assignmentId: row.assignment_id, description: row.task_description,
+      scheduledDate: row.scheduled_date, completed: row.completed,
+    }));
     const publishedItemsResult = context.published_plan_version_id
       ? await db.query(
         `SELECT pvi.logical_task_id,pvi.task_description,pvi.scheduled_date,pvi.estimated_minutes,
@@ -331,6 +354,8 @@ export async function executeGenericAgentRun(
         latestUserMessage: recentMessages.filter((message) => message.role === 'user').at(-1)?.content || context.message_content || '',
         activeTutorTopic: persistedContext.activeTutorTopic || null,
         confirmedMemories,
+        availableAssignments,
+        availableTasks,
         existingLoad,
         detectedConflicts: context.trigger_context?.conflicts || [],
       }),
@@ -490,8 +515,35 @@ export async function executeGenericAgentRun(
         });
         return { approvalId: approval.id, proposalHash: approval.proposal_hash };
       },
+      tutor: async (state) => {
+        if (!specialists || !usageAccountingHealthy || !await budget.canUseReservedAgentModelCall(runId)) {
+          throw Object.assign(new Error('Conversational model execution is unavailable.'), { code: 'MODEL_UNAVAILABLE' });
+        }
+        return specialists.tutor(state);
+      },
+      groundResources: async (state) => {
+        const monthly = await db.query(
+          `SELECT COUNT(*)::int AS count FROM agent_run_events e JOIN agent_runs r ON r.id=e.run_id
+           WHERE r.user_id=$1 AND e.detail_code='GOOGLE_SEARCH_COMPLETED'
+             AND e.created_at >= date_trunc('month', CURRENT_TIMESTAMP)`,
+          [context.user_id],
+        );
+        if (Number(monthly.rows[0]?.count || 0) >= config.aiSearchMonthlyRequestLimit) {
+          return { ...(state.assistantResponse!), citations: [], answer: `${state.assistantResponse?.answer || ''}\n\nVerified resource search has reached its monthly limit.` };
+        }
+        try {
+          const response = await groundTutorResources({ state, gateway: searchGateway });
+          await appendRunEvent(runId, 'tool', 'resources', 'GOOGLE_SEARCH_COMPLETED', 'Grounded resource lookup completed.');
+          return response;
+        } catch (error) {
+          await appendRunEvent(runId, 'tool', 'resources', 'GOOGLE_SEARCH_FAILED', 'Grounded resource lookup was unavailable.');
+          return { ...(state.assistantResponse!), citations: [], answer: `${state.assistantResponse?.answer || ''}\n\nI could not retrieve verified links right now.` };
+        }
+      },
       answer: (state) => state.failureCode
         ? 'No safe plan could be created with the current constraints.'
+        : state.assistantResponse?.answer
+          ? state.assistantResponse.answer
         : state.shadowMode
           ? 'Shadow plan evaluation completed without changing the published plan.'
         : state.approvalDecision?.decision === 'reject'
@@ -558,10 +610,11 @@ export async function executeGenericAgentRun(
         await appendRunEvent(runId, status, status, waitingForApproval ? 'APPROVAL_REQUIRED' : 'CLARIFICATION_REQUIRED', safeDetail);
         if (context.thread_id) {
           await db.query(
-            `INSERT INTO agent_messages (id, thread_id, user_id, role, content)
-             VALUES ($1, $2, $3, 'assistant', $4)`,
+            `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
+             VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
             [crypto.randomUUID(), context.thread_id, context.user_id,
-              waitingForApproval ? safeDetail : interrupts[0]?.value?.question || 'What detail would help me continue?'],
+              waitingForApproval ? safeDetail : interrupts[0]?.value?.question || 'What detail would help me continue?',
+              JSON.stringify({ kind: waitingForApproval ? 'proposal' : 'clarification', runId })],
           );
           await db.query(
             `UPDATE agent_threads SET context_state=$2::jsonb,context_version=context_version+1,
@@ -595,9 +648,15 @@ export async function executeGenericAgentRun(
       await appendRunEvent(runId, failed ? 'failed' : 'succeeded', failed ? 'validation' : 'completed', failed ? 'PLAN_FAILED' : 'PLAN_PUBLISHED', result.finalResponse || 'Agent run completed.');
       if (context.thread_id && result.finalResponse) {
         await db.query(
-          `INSERT INTO agent_messages (id, thread_id, user_id, role, content)
-           VALUES ($1, $2, $3, 'assistant', $4)`,
-          [crypto.randomUUID(), context.thread_id, context.user_id, result.finalResponse],
+          `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
+           VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
+          [crypto.randomUUID(), context.thread_id, context.user_id, result.finalResponse, JSON.stringify({
+            kind: result.assistantResponse?.kind || (failed ? 'failure' : result.planVersionId ? 'plan' : 'answer'),
+            runId,
+            citations: result.assistantResponse?.citations || [],
+            suggestedActions: result.assistantResponse?.suggestedActions || [],
+            planSource: result.planVersionId ? (result.usingFallback ? 'fallback' : 'agentic') : undefined,
+          })],
         );
         await db.query(
           `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,context_state=$4::jsonb,

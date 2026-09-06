@@ -28,12 +28,22 @@ export type AssistantDecision = {
   clarificationQuestion?: string;
   answer?: string;
   preferenceProposal?: { key: string; value: string };
+  useGroundedResources?: boolean;
 };
 export type IntentEnvelope = AssistantDecision;
 
 export type ReviewResult = {
   accept: boolean;
   issues: Array<{ code: string; instruction: string }>;
+};
+
+export type AssistantCitation = { title: string; url: string };
+export type AssistantResponse = {
+  kind: 'answer' | 'tutor' | 'clarification' | 'plan' | 'proposal' | 'failure';
+  answer: string;
+  studyTips: string[];
+  suggestedActions: Array<{ label: string; prompt: string }>;
+  citations: AssistantCitation[];
 };
 
 export type ApprovalDecision = {
@@ -74,8 +84,11 @@ export const DisciplanGraphState = Annotation.Root({
   collectedContext: Annotation<CollectedContext>,
   activeTutorTopic: Annotation<string | null>,
   pendingClarification: Annotation<{ question: string; missingFields: string[] } | null>,
+  assistantResponse: Annotation<AssistantResponse | null>,
   conversationSummary: Annotation<string>,
   confirmedMemories: Annotation<Record<string, string>>,
+  availableAssignments: Annotation<Array<{ id: number; title: string; description: string; dueDate: string; complexity: string }>>,
+  availableTasks: Annotation<Array<{ id: number; assignmentId: number; description: string; scheduledDate: string; completed: boolean }>>,
   intent: Annotation<IntentEnvelope | null>,
   assignment: Annotation<AssignmentSnapshot | null>,
   planningProfile: Annotation<PlanningProfileSnapshot | null>,
@@ -123,8 +136,11 @@ export const createInitialGraphState = (input: Pick<DisciplanState,
   collectedContext: input.collectedContext ?? {},
   activeTutorTopic: input.activeTutorTopic ?? null,
   pendingClarification: input.pendingClarification ?? null,
+  assistantResponse: input.assistantResponse ?? null,
   conversationSummary: input.conversationSummary ?? '',
   confirmedMemories: input.confirmedMemories ?? {},
+  availableAssignments: input.availableAssignments ?? [],
+  availableTasks: input.availableTasks ?? [],
   intent: input.intent ?? null,
   assignment: input.assignment ?? null,
   planningProfile: input.planningProfile ?? null,

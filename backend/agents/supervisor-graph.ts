@@ -3,6 +3,7 @@ import type { PlanDraft } from '../../shared/contracts.js';
 import {
   DisciplanGraphState,
   type ApprovalDecision,
+  type AssistantResponse,
   type DisciplanState,
   type DisciplanStateUpdate,
   type IntentEnvelope,
@@ -22,6 +23,8 @@ export type SupervisorDependencies = {
   publishInitial: (state: DisciplanState) => Promise<void>;
   publishRepair: (state: DisciplanState) => Promise<void>;
   createApproval: (state: DisciplanState) => Promise<{ approvalId: string; proposalHash: string }>;
+  tutor: (state: DisciplanState) => Promise<AssistantResponse>;
+  groundResources: (state: DisciplanState) => Promise<AssistantResponse>;
   answer: (state: DisciplanState) => Promise<string> | string;
 };
 
@@ -100,6 +103,16 @@ export const createSupervisorGraph = (
         usingFallback: result.usingFallback,
       };
     })
+    .addNode('tutor', async (state) => {
+      ensureActive(state);
+      const response = await dependencies.tutor(state);
+      return { assistantResponse: response, finalResponse: response.answer, modelCallCount: state.modelCallCount + 1 };
+    })
+    .addNode('resources', async (state) => {
+      ensureActive(state);
+      const response = await dependencies.groundResources(state);
+      return { assistantResponse: response, finalResponse: response.answer, modelCallCount: state.modelCallCount + 1 };
+    })
     .addNode('validate', async (state) => ({ deterministicIssues: await dependencies.validatePlan(state) }))
     .addNode('review', async (state) => {
       ensureActive(state);
@@ -134,7 +147,7 @@ export const createSupervisorGraph = (
       await dependencies.publishRepair(state);
       return { finalResponse: await dependencies.answer(state) };
     })
-    .addNode('respond', async (state) => ({ finalResponse: await dependencies.answer(state) }))
+    .addNode('respond', async (state) => state.finalResponse ? {} : ({ finalResponse: await dependencies.answer(state) }))
     .addNode('fail', () => ({
       failureCode: 'VALIDATION_FAILED',
       finalResponse: 'No plan could satisfy the current scheduling constraints.',
@@ -145,10 +158,12 @@ export const createSupervisorGraph = (
       if (!state.intent || state.intent.intent === 'clarify' || state.intent.missingFields.length) return 'clarify';
       if (state.intent.intent === 'publish_initial_plan') return state.assignment ? 'plan' : 'materializeAssignment';
       if (state.intent.intent === 'repair_plan') return 'repair';
-      return 'respond';
-    }, ['clarify', 'materializeAssignment', 'plan', 'repair', 'respond'])
+      return 'tutor';
+    }, ['clarify', 'materializeAssignment', 'plan', 'repair', 'tutor'])
     .addEdge('clarify', 'context')
     .addEdge('materializeAssignment', 'plan')
+    .addConditionalEdges('tutor', (state) => state.intent?.useGroundedResources ? 'resources' : 'respond', ['resources', 'respond'])
+    .addEdge('resources', 'respond')
     .addEdge('plan', 'validate')
     .addEdge('repair', 'validate')
     .addConditionalEdges('validate', (state) => {

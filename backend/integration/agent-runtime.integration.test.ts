@@ -292,6 +292,8 @@ describe.skipIf(!enabled)('agent runtime Postgres integration', () => {
       publishInitial: async () => undefined,
       publishRepair: async () => undefined,
       createApproval: async () => ({ approvalId: crypto.randomUUID(), proposalHash: 'b'.repeat(64) }),
+      tutor: async () => ({ kind: 'tutor', answer: 'Let us work through it.', studyTips: [], suggestedActions: [], citations: [] }),
+      groundResources: async (state) => state.assistantResponse || ({ kind: 'tutor', answer: 'No resources.', studyTips: [], suggestedActions: [], citations: [] }),
       answer: async () => 'Restarted plan is ready.',
     });
     const firstSaver = PostgresSaver.fromConnString(connectionString, { schema: 'agent_memory' });

@@ -1,4 +1,4 @@
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatGoogle } from '@langchain/google';
 
 export type ModelUsage = {
   inputTokens: number;
@@ -9,7 +9,7 @@ export type ModelUsage = {
 export interface ModelGateway {
   readonly provider: string;
   readonly modelName: string;
-  createChatModel(): ChatGoogleGenerativeAI;
+  createChatModel(): ChatGoogle;
   recordUsage?(input: { role: string; runId: string; actorUserId: number; usage: ModelUsage }): Promise<void>;
 }
 
@@ -32,7 +32,6 @@ export const buildGeminiModelOptions = (config: GeminiGatewayConfig) => {
     apiKey: config.apiKey,
     model: config.modelName,
     maxOutputTokens: config.maxOutputTokens,
-    temperature: 0.2,
     maxRetries: 0,
     ...(config.thinkingBudget > 0
       ? { thinkingConfig: { thinkingBudget: config.thinkingBudget } }
@@ -50,7 +49,7 @@ export class GeminiModelGateway implements ModelGateway {
 
   createChatModel() {
     if (!this.config.apiKey) throw Object.assign(new Error('Gemini is not configured.'), { code: 'MODEL_UNAVAILABLE' });
-    return new ChatGoogleGenerativeAI(buildGeminiModelOptions(this.config));
+    return new ChatGoogle(buildGeminiModelOptions(this.config));
   }
 
   async recordUsage(input: { role: string; runId: string; actorUserId: number; usage: ModelUsage }) {

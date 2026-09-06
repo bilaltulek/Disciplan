@@ -17,6 +17,7 @@ describe('agent runtime request boundary', () => {
     const runtimeConfig = { agentExecutionPolicy: { effectiveModeForUser: () => 'shadow' } };
     expect(agentCapabilitiesForRequest(runtimeConfig, { user: { id: 42 } })).toEqual({
       mode: 'shadow', conversationalPlanning: false, asynchronousFormPlanning: false,
+      tutoring: false, groundedResources: false,
     });
   });
 });

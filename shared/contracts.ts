@@ -28,6 +28,15 @@ export const AgentRunStatusSchema = z.enum([
 export type AgentRunStatus = z.infer<typeof AgentRunStatusSchema>;
 export type RunStatus = AgentRunStatus;
 
+export const AssistantMessageMetadataSchema = z.object({
+  kind: z.enum(['answer', 'tutor', 'clarification', 'plan', 'proposal', 'failure']),
+  runId: UuidSchema,
+  citations: z.array(z.object({ title: z.string().max(200), url: z.string().url().startsWith('https://') })).max(5).optional(),
+  suggestedActions: z.array(z.object({ label: z.string().max(80), prompt: z.string().max(500) })).max(5).optional(),
+  planSource: z.enum(['agentic', 'fallback']).optional(),
+});
+export type AssistantMessageMetadata = z.infer<typeof AssistantMessageMetadataSchema>;
+
 export const PlanTaskInputSchema = z.object({
   logicalTaskId: UuidSchema.optional(),
   taskDescription: z.string().trim().min(3).max(500),

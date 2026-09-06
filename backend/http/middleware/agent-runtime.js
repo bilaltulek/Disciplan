@@ -10,6 +10,8 @@ const agentCapabilitiesForRequest = (runtimeConfig, req) => {
     mode,
     conversationalPlanning: mode === 'active',
     asynchronousFormPlanning: mode === 'active',
+    tutoring: mode === 'active',
+    groundedResources: mode === 'active',
   };
 };
 

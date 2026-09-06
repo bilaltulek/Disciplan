@@ -26,6 +26,8 @@ const dependencies = (): SupervisorDependencies => ({
   publishInitial: vi.fn(async () => undefined),
   publishRepair: vi.fn(async () => undefined),
   createApproval: vi.fn(async () => ({ approvalId: 'bbdfc4a0-af2b-4cf4-a3de-70b0bf55d45f', proposalHash: 'a'.repeat(64) })),
+  tutor: vi.fn(async () => ({ kind: 'tutor' as const, answer: 'Let us work through it.', studyTips: [], suggestedActions: [], citations: [] })),
+  groundResources: vi.fn(async (state) => state.assistantResponse || ({ kind: 'tutor' as const, answer: 'No resources.', studyTips: [], suggestedActions: [], citations: [] })),
   answer: vi.fn(async () => 'Your plan is ready.'),
 });
 
@@ -132,5 +134,22 @@ describe('explicit Disciplan supervisor graph', () => {
     expect(deps.reviewPlan).toHaveBeenCalledOnce();
     expect(deps.createApproval).toHaveBeenCalledOnce();
     expect(deps.publishRepair).toHaveBeenCalledOnce();
+  });
+
+  it('routes tutoring directly without asking for assignment fields', async () => {
+    const deps = dependencies();
+    vi.mocked(deps.coordinate).mockResolvedValue({
+      intent: 'tutor', assignmentId: null, missingFields: [], responseMode: 'answer',
+      contextDelta: { topic: 'C pointers' },
+    });
+    const graph = createSupervisorGraph(deps);
+    const result = await graph.invoke(createInitialGraphState({
+      runId: '92be522f-ff57-4eef-a06d-a52e89c48721', actorUserId: 7,
+      runType: 'conversation', triggerType: 'user_message', userRequest: 'Teach me pointers.',
+    }));
+    expect(deps.tutor).toHaveBeenCalledOnce();
+    expect(deps.materializeAssignment).not.toHaveBeenCalled();
+    expect(result.finalResponse).toBe('Let us work through it.');
+    expect(result.collectedContext.topic).toBe('C pointers');
   });
 });

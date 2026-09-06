@@ -146,6 +146,9 @@ const config = {
     return readGeminiApiKey();
   },
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+  geminiRouterModel: process.env.GEMINI_ROUTER_MODEL || process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+  geminiAgentModel: process.env.GEMINI_AGENT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+  geminiSearchModel: process.env.GEMINI_SEARCH_MODEL || process.env.GEMINI_AGENT_MODEL || process.env.GEMINI_MODEL || 'gemini-3.6-flash',
   aiBudgetMonthlyUsd: toPositiveFloat(process.env.AI_BUDGET_MONTHLY_USD, 20, 'AI_BUDGET_MONTHLY_USD'),
   aiBudgetHardStopUsd: toPositiveFloat(process.env.AI_BUDGET_HARD_STOP_USD, 19, 'AI_BUDGET_HARD_STOP_USD'),
   aiMaxOutputTokens: toPositiveInt(process.env.AI_MAX_OUTPUT_TOKENS, 4096, 'AI_MAX_OUTPUT_TOKENS'),
@@ -154,6 +157,8 @@ const config = {
   aiAgentMaxIterations: toPositiveInt(process.env.AI_AGENT_MAX_ITERATIONS, 1, 'AI_AGENT_MAX_ITERATIONS'),
   aiAgentMaxModelCalls: toPositiveInt(process.env.AI_AGENT_MAX_MODEL_CALLS, 5, 'AI_AGENT_MAX_MODEL_CALLS'),
   aiAgentMaxToolCalls: toPositiveInt(process.env.AI_AGENT_MAX_TOOL_CALLS, 12, 'AI_AGENT_MAX_TOOL_CALLS'),
+  aiAgentMaxSearchCalls: toPositiveInt(process.env.AI_AGENT_MAX_SEARCH_CALLS, 2, 'AI_AGENT_MAX_SEARCH_CALLS'),
+  aiSearchMonthlyRequestLimit: toPositiveInt(process.env.AI_SEARCH_MONTHLY_REQUEST_LIMIT, 100, 'AI_SEARCH_MONTHLY_REQUEST_LIMIT'),
   aiAgentRunMaxReservationUsd: toPositiveFloat(
     process.env.AI_AGENT_RUN_MAX_RESERVATION_USD,
     0.10,
@@ -189,7 +194,7 @@ if (config.aiAgentRunMaxReservationUsd > config.aiBudgetHardStopUsd) {
   throw new Error('Invalid AI budget configuration: AI_AGENT_RUN_MAX_RESERVATION_USD cannot exceed AI_BUDGET_HARD_STOP_USD.');
 }
 
-if (config.aiAgentMaxIterations > 1 || config.aiAgentMaxModelCalls > 5 || config.aiAgentMaxToolCalls > 12) {
+if (config.aiAgentMaxIterations > 1 || config.aiAgentMaxModelCalls > 5 || config.aiAgentMaxToolCalls > 12 || config.aiAgentMaxSearchCalls > 2) {
   throw new Error('Agent workflow limits are bounded at one revision, five model calls, and twelve tool calls.');
 }
 

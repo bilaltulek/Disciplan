@@ -1,6 +1,6 @@
 import { HumanMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatGoogle } from '@langchain/google';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { z } from 'zod';
@@ -91,7 +91,7 @@ const reviewerTools = (
   }),
 ];
 
-const model = () => new ChatGoogleGenerativeAI({
+const model = () => new ChatGoogle({
   apiKey: config.geminiApiKey,
   model: config.geminiModel,
   maxOutputTokens: config.aiMaxOutputTokens,
