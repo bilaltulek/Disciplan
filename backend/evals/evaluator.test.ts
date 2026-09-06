@@ -36,7 +36,7 @@ describe('agent evaluation release gates', () => {
     const outcomes = passingOutcomes().slice(1);
     for (let index = 0; index < 10; index += 1) {
       outcomes[index] = {
-        ...outcomes[index], actualIntent: 'read_only', schemaValid: false,
+        ...outcomes[index], actualIntent: 'answer', schemaValid: false,
         invariantViolations: ['CAPACITY_EXCEEDED'], approvalBypassed: index === 0,
         duplicatePublishes: index === 0 ? 1 : 0, semanticPass: false,
       };

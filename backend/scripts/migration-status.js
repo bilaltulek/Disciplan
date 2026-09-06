@@ -69,6 +69,12 @@ const MIGRATION_REQUIREMENTS = {
   '008_plan_feedback.sql': [
     'table:plan_feedback',
   ],
+  '009_conversation_context.sql': [
+    'column:agent_threads.context_state',
+    'column:agent_threads.context_version',
+    'column:agent_threads.summary_through_message_id',
+    'column:agent_runs.resume_count',
+  ],
 };
 
 const classifyMigrationState = (availableObjects) => Object.fromEntries(

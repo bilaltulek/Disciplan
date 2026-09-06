@@ -77,4 +77,18 @@ describe('specialist tool allowlists', () => {
     });
     expect(parsed.tasks[0]).not.toHaveProperty('logicalTaskId');
   });
+
+  it('allows tutoring without assignment-form fields and accepts incremental context', () => {
+    expect(IntentEnvelopeSchema.parse({
+      intent: 'tutor', assignmentId: null, missingFields: [], responseMode: 'answer',
+      contextDelta: { topic: 'C pointers', learningGoal: 'Understand pointer arithmetic' },
+      answer: 'Let us start with what a pointer stores.',
+    })).toMatchObject({ intent: 'tutor', missingFields: [] });
+
+    expect(IntentEnvelopeSchema.parse({
+      intent: 'clarify', assignmentId: null, missingFields: ['schedule deadline'], responseMode: 'question',
+      clarificationQuestion: 'I understand that you want this scheduled. When would you like to finish it?',
+      contextDelta: { title: 'Operating systems review', complexity: 'Medium' },
+    }).contextDelta?.title).toBe('Operating systems review');
+  });
 });

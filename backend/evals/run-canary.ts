@@ -79,7 +79,7 @@ const main = async () => {
     };
     const base = createInitialGraphState({
       runId: crypto.randomUUID(), actorUserId: 1, assignmentId: assignment?.id ?? null,
-      runType: item.expectedIntent === 'repair' ? 'repair' : 'conversation',
+      runType: item.expectedIntent === 'repair_plan' ? 'repair' : 'conversation',
       triggerType: 'user_message', userRequest: item.request,
     });
     const state = {
@@ -90,8 +90,8 @@ const main = async () => {
         maxDailyMinutes: 120, preferredSessionMinutes: 45, version: 1,
       },
       planningDate: today,
-      existingPlanVersionId: item.expectedIntent === 'repair' ? crypto.randomUUID() : null,
-      existingPlan: item.expectedIntent === 'repair' ? [{
+      existingPlanVersionId: item.expectedIntent === 'repair_plan' ? crypto.randomUUID() : null,
+      existingPlan: item.expectedIntent === 'repair_plan' ? [{
         logicalTaskId: crypto.randomUUID(), taskDescription: 'Finish existing work',
         scheduledDate: today, estimatedMinutes: 30,
       }] : [],
@@ -134,7 +134,7 @@ const main = async () => {
       const schemaValid = true;
       let invariantViolations: string[] = [];
       let semanticPass = intent.intent === item.expectedIntent;
-      if (intent.intent === 'initial_plan' && assignment) {
+      if (intent.intent === 'publish_initial_plan' && assignment) {
         let draft: PlanDraft | null = null;
         let usingFallback = false;
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -188,7 +188,7 @@ const main = async () => {
           && draft.tasks.every((task) => task.taskDescription.trim().length >= 3)
           && (item.requiredTopics || []).every((topic) => draftText.includes(topic.toLowerCase()))
           && (item.forbiddenTerms || []).every((term) => !draftText.includes(term.toLowerCase()));
-      } else if (intent.intent === 'repair' && assignment) {
+      } else if (intent.intent === 'repair_plan' && assignment) {
         let draft: PlanDraft;
         stage = 'repair';
         try {

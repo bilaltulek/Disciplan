@@ -15,7 +15,7 @@ const dependencies = (): SupervisorDependencies => ({
     assignment: { id: 1, title: 'Essay', description: '', complexity: 'Medium' as const, dueDate: '2026-09-02', totalItems: 3 },
     planningProfile: { timezone: 'UTC', weekdayAvailableMinutes: { 1: 60 }, maxDailyMinutes: 60, preferredSessionMinutes: 30, version: 1 },
   })),
-  coordinate: vi.fn(async () => ({ intent: 'initial_plan' as const, assignmentId: 1, missingFields: [], responseMode: 'plan' as const })),
+  coordinate: vi.fn(async () => ({ intent: 'publish_initial_plan' as const, assignmentId: 1, missingFields: [], responseMode: 'plan' as const })),
   materializeAssignment: vi.fn(async () => ({ assignmentId: 1 })),
   createPlan: vi.fn(async () => ({ draft: validDraft, usingFallback: false })),
   repairPlan: vi.fn(async () => ({ draft: validDraft, usingFallback: false })),
@@ -82,7 +82,7 @@ describe('explicit Disciplan supervisor graph', () => {
     const deps = dependencies();
     vi.mocked(deps.coordinate)
       .mockResolvedValueOnce({ intent: 'clarify', assignmentId: 1, missingFields: ['dueDate'], responseMode: 'question' })
-      .mockResolvedValueOnce({ intent: 'initial_plan', assignmentId: 1, missingFields: [], responseMode: 'plan' });
+      .mockResolvedValueOnce({ intent: 'publish_initial_plan', assignmentId: 1, missingFields: [], responseMode: 'plan' });
     const graph = createSupervisorGraph(deps, { checkpointer: new MemorySaver() });
     const config = { configurable: { thread_id: 'clarification-test' } };
     const interrupted = await graph.invoke(createInitialGraphState({
@@ -95,6 +95,10 @@ describe('explicit Disciplan supervisor graph', () => {
     const resumed = await graph.invoke(new Command({ resume: { response: 'It is due September 2.' } }), config);
     expect(resumed.finalResponse).toBe('Your plan is ready.');
     expect(deps.coordinate).toHaveBeenCalledTimes(2);
+    const secondState = vi.mocked(deps.coordinate).mock.calls[1][0];
+    expect(secondState.originalGoal).toBe('Plan my essay.');
+    expect(secondState.latestUserMessage).toBe('It is due September 2.');
+    expect(secondState.conversationMessages.at(-1)?.content).toBe('It is due September 2.');
     expect(deps.createPlan).toHaveBeenCalledOnce();
     expect(deps.publishInitial).toHaveBeenCalledOnce();
   });
@@ -102,7 +106,7 @@ describe('explicit Disciplan supervisor graph', () => {
   it('checkpoints an approval interrupt and resumes the exact proposal without repeating model nodes', async () => {
     const deps = dependencies();
     vi.mocked(deps.coordinate).mockResolvedValue({
-      intent: 'repair', assignmentId: 1, missingFields: [], responseMode: 'plan',
+      intent: 'repair_plan', assignmentId: 1, missingFields: [], responseMode: 'plan',
     });
     vi.mocked(deps.loadContext).mockResolvedValue({
       assignmentId: 1,

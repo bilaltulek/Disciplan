@@ -40,14 +40,37 @@ export const createSupervisorGraph = (
     })
     .addNode('coordinate', async (state) => {
       ensureActive(state);
-      return { intent: await dependencies.coordinate(state), modelCallCount: state.modelCallCount + 1 };
+      const intent = await dependencies.coordinate(state);
+      const sourceMessageIds = state.conversationMessages.filter((message) => message.role === 'user').map((message) => message.id);
+      return {
+        intent,
+        collectedContext: {
+          ...state.collectedContext,
+          ...(intent.contextDelta ?? {}),
+          sourceMessageIds: [...new Set([...(state.collectedContext.sourceMessageIds ?? []), ...sourceMessageIds])].slice(-50),
+        },
+        pendingClarification: intent.intent === 'clarify'
+          ? { question: intent.clarificationQuestion || 'What detail would help me continue?', missingFields: intent.missingFields }
+          : null,
+        modelCallCount: state.modelCallCount + 1,
+      };
     })
     .addNode('clarify', (state) => {
       const response = interrupt({
         type: 'clarification',
         missingFields: state.intent?.missingFields ?? [],
+        question: state.intent?.clarificationQuestion || 'What detail would help me continue?',
       }) as { response: string };
-      return { userRequest: response.response, intent: null };
+      return {
+        latestUserMessage: response.response,
+        conversationMessages: [...state.conversationMessages, {
+          id: `resume-${state.runId}-${state.conversationMessages.length}`,
+          role: 'user' as const,
+          content: response.response,
+        }],
+        intent: null,
+        pendingClarification: null,
+      };
     })
     .addNode('materializeAssignment', async (state) => {
       ensureActive(state);
@@ -120,8 +143,8 @@ export const createSupervisorGraph = (
     .addEdge('context', 'coordinate')
     .addConditionalEdges('coordinate', (state) => {
       if (!state.intent || state.intent.intent === 'clarify' || state.intent.missingFields.length) return 'clarify';
-      if (state.intent.intent === 'initial_plan') return state.assignment ? 'plan' : 'materializeAssignment';
-      if (state.intent.intent === 'repair') return 'repair';
+      if (state.intent.intent === 'publish_initial_plan') return state.assignment ? 'plan' : 'materializeAssignment';
+      if (state.intent.intent === 'repair_plan') return 'repair';
       return 'respond';
     }, ['clarify', 'materializeAssignment', 'plan', 'repair', 'respond'])
     .addEdge('clarify', 'context')
@@ -143,7 +166,7 @@ export const createSupervisorGraph = (
     .addConditionalEdges('saveDraft', (state) => (
       state.shadowMode
         ? 'respond'
-        : state.intent?.intent === 'initial_plan' && !state.existingPlanVersionId
+        : state.intent?.intent === 'publish_initial_plan' && !state.existingPlanVersionId
         ? 'publishInitial'
         : 'createApproval'
     ), ['respond', 'publishInitial', 'createApproval'])

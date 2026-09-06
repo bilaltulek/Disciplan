@@ -12,17 +12,27 @@ const { PROMPTS } = require('./runtime-registry.js') as {
 };
 
 const IntentEnvelopeSchema = z.object({
-  intent: z.enum(['initial_plan', 'repair', 'read_only', 'clarify']),
+  intent: z.enum(['tutor', 'answer', 'draft_plan', 'publish_initial_plan', 'repair_plan', 'break_down_task', 'schedule_query', 'clarify']),
   assignmentId: z.number().int().min(1).nullable(),
   missingFields: z.array(z.string().trim().min(1).max(80)).max(10),
   responseMode: z.enum(['plan', 'answer', 'question']),
-  normalizedAssignment: z.object({
-    title: z.string().trim().min(3).max(200),
-    description: z.string().max(2_000),
-    complexity: z.enum(['Easy', 'Medium', 'Hard']),
-    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    totalItems: z.number().int().min(1).max(1_000),
+  contextDelta: z.object({
+    title: z.string().trim().min(3).max(200).optional(),
+    description: z.string().max(2_000).optional(),
+    complexity: z.enum(['Easy', 'Medium', 'Hard']).optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    totalItems: z.number().int().min(1).max(1_000).optional(),
+    topic: z.string().trim().min(1).max(300).optional(),
+    learningGoal: z.string().trim().min(1).max(500).optional(),
   }).optional(),
+  normalizedAssignment: z.object({
+    title: z.string().trim().min(3).max(200).optional(),
+    description: z.string().max(2_000).optional(),
+    complexity: z.enum(['Easy', 'Medium', 'Hard']).optional(),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    totalItems: z.number().int().min(1).max(1_000).optional(),
+  }).optional(),
+  clarificationQuestion: z.string().trim().min(1).max(500).optional(),
   answer: z.string().trim().min(1).max(2_000).optional(),
   preferenceProposal: z.object({
     key: z.enum(['planning_style', 'task_description_style', 'study_preferences']),
@@ -61,6 +71,10 @@ const ModelRepairPlanDraftSchema = modelPlanEnvelope(z.object({
 
 const untrustedPayload = (state: DisciplanState) => JSON.stringify({
   userRequest: state.userRequest,
+  originalGoal: state.originalGoal,
+  latestUserMessage: state.latestUserMessage,
+  conversationMessages: state.conversationMessages,
+  collectedContext: state.collectedContext,
   conversationSummary: state.conversationSummary,
   confirmedMemories: state.confirmedMemories,
   assignment: state.assignment,

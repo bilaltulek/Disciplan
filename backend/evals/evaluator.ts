@@ -2,7 +2,7 @@ import type { EvaluationCase } from './dataset.js';
 
 export type EvaluationOutcome = {
   id: string;
-  actualIntent: 'initial_plan' | 'repair' | 'clarify' | 'read_only' | 'error';
+  actualIntent: 'publish_initial_plan' | 'repair_plan' | 'clarify' | 'answer' | 'tutor' | 'draft_plan' | 'break_down_task' | 'schedule_query' | 'error';
   schemaValid: boolean;
   invariantViolations: string[];
   approvalBypassed: boolean;

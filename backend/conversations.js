@@ -2,8 +2,8 @@ const crypto = require('crypto');
 const db = require('./db');
 const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('./agents/runtime-registry');
 
-const hashMessageRequest = ({ content, assignmentId }) => crypto.createHash('sha256')
-  .update(JSON.stringify({ assignmentId: assignmentId || null, content }))
+const hashMessageRequest = ({ content, assignmentId, replyToRunId }) => crypto.createHash('sha256')
+  .update(JSON.stringify({ assignmentId: assignmentId || null, replyToRunId: replyToRunId || null, content }))
   .digest('hex');
 
 const createThreadForUser = async ({ userId, title = null }) => {
@@ -43,9 +43,9 @@ const getThreadForUser = async ({ userId, threadId, before, limit = 50 }) => {
   return { thread: thread.rows[0], messages: messages.rows.reverse() };
 };
 
-const createMessageRun = async ({ userId, threadId, content, assignmentId, clientMessageId, idempotencyKey }) => {
+const createMessageRun = async ({ userId, threadId, content, assignmentId, replyToRunId, clientMessageId, idempotencyKey }) => {
   const client = await db.connect();
-  const requestHash = hashMessageRequest({ content, assignmentId });
+  const requestHash = hashMessageRequest({ content, assignmentId, replyToRunId });
   try {
     await client.query('BEGIN');
     const thread = await client.query(
@@ -74,8 +74,9 @@ const createMessageRun = async ({ userId, threadId, content, assignmentId, clien
     const waiting = await client.query(
       `SELECT * FROM agent_runs
        WHERE thread_id = $1 AND user_id = $2 AND status = 'waiting_for_input'
+         AND ($3::uuid IS NULL OR id = $3)
        ORDER BY updated_at DESC LIMIT 1 FOR UPDATE`,
-      [threadId, userId],
+      [threadId, userId, replyToRunId || null],
     );
     if (waiting.rows[0]) {
       const resumeId = crypto.randomUUID();
@@ -102,6 +103,11 @@ const createMessageRun = async ({ userId, threadId, content, assignmentId, clien
       );
       await client.query('COMMIT');
       return { message: message.rows[0], run: run.rows[0], resume: resumed.rows[0], duplicate: false };
+    }
+    if (replyToRunId) {
+      const stale = new Error('The clarification is no longer waiting for a response.');
+      stale.code = 'STALE_CLARIFICATION';
+      throw stale;
     }
     const runId = crypto.randomUUID();
     const run = await client.query(

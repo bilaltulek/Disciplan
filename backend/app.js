@@ -220,14 +220,16 @@ app.post('/api/agent-threads/:id/messages', authenticateToken, agentRateLimit, r
   const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
   const clientMessageId = typeof req.body?.clientMessageId === 'string' ? req.body.clientMessageId.trim() : '';
   const assignmentId = req.body?.assignmentId == null ? null : Number(req.body.assignmentId);
+  const replyToRunId = req.body?.replyToRunId == null ? null : String(req.body.replyToRunId).trim();
   const idempotencyKey = req.get('Idempotency-Key');
   if (content.length < 1 || content.length > 4000 || clientMessageId.length < 8 || clientMessageId.length > 128
       || typeof idempotencyKey !== 'string' || idempotencyKey.length < 8 || idempotencyKey.length > 128
-      || (assignmentId !== null && (!Number.isInteger(assignmentId) || assignmentId < 1))) {
+      || (assignmentId !== null && (!Number.isInteger(assignmentId) || assignmentId < 1))
+      || (replyToRunId !== null && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(replyToRunId))) {
     return res.status(400).json({ error: 'Invalid conversation message.' });
   }
   const created = await createMessageRun({
-    userId: req.user.id, threadId: req.params.id, content, assignmentId, clientMessageId, idempotencyKey,
+    userId: req.user.id, threadId: req.params.id, content, assignmentId, replyToRunId, clientMessageId, idempotencyKey,
   });
   await dispatchRunBestEffort(created.run.id);
   return res.status(202).json(created);

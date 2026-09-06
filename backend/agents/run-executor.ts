@@ -53,6 +53,8 @@ type RunContextRow = {
   preferred_session_minutes: number | null;
   profile_version: number | null;
   published_plan_version_id: string | null;
+  thread_summary: string | null;
+  thread_context: Record<string, unknown> | null;
 };
 
 const appendRunEvent = async (runId: string, eventType: string, step: string, detailCode: string, safeDetail: string) => {
@@ -69,11 +71,14 @@ const loadContext = async (runId: string): Promise<RunContextRow | null> => {
             p.timezone, p.weekday_available_minutes, p.max_daily_minutes,
             p.preferred_session_minutes, p.version AS profile_version,
             m.content AS message_content,
-            published.id AS published_plan_version_id
+            published.id AS published_plan_version_id,
+            th.summary AS thread_summary,
+            th.context_state AS thread_context
      FROM agent_runs r
      LEFT JOIN assignments a ON a.id = r.assignment_id AND a.user_id = r.user_id
      LEFT JOIN agent_messages m ON m.id = r.input_message_id AND m.user_id = r.user_id
      LEFT JOIN user_planning_profiles p ON p.user_id = r.user_id
+     LEFT JOIN agent_threads th ON th.id = r.thread_id AND th.user_id = r.user_id
      LEFT JOIN LATERAL (
        SELECT id FROM plan_versions
        WHERE assignment_id = r.assignment_id AND status = 'published'
@@ -130,7 +135,13 @@ export async function executeGenericAgentRun(
   try {
     const claimed = await db.query(
       `UPDATE agent_runs SET status = 'running', current_step = 'context',
-       attempt_number = attempt_number + 1, started_at = COALESCE(started_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP
+       attempt_number = attempt_number + CASE WHEN EXISTS (
+         SELECT 1 FROM agent_run_resumes rr WHERE rr.run_id=agent_runs.id AND rr.status='pending'
+       ) THEN 0 ELSE 1 END,
+       resume_count = resume_count + CASE WHEN EXISTS (
+         SELECT 1 FROM agent_run_resumes rr WHERE rr.run_id=agent_runs.id AND rr.status='pending'
+       ) THEN 1 ELSE 0 END,
+       started_at = COALESCE(started_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND status IN ('accepted', 'queued', 'running') AND cancellation_requested_at IS NULL
        RETURNING *`,
       [runId],
@@ -245,9 +256,9 @@ export async function executeGenericAgentRun(
     const [conversationResult, memoriesResult] = await Promise.all([
       context.thread_id
         ? db.query(
-          `SELECT role,content FROM agent_messages
+          `SELECT id,role,content FROM agent_messages
            WHERE thread_id=$1 AND user_id=$2
-           ORDER BY created_at DESC,id DESC LIMIT 20`,
+           ORDER BY created_at DESC,id DESC LIMIT 60`,
           [context.thread_id, context.user_id],
         )
         : Promise.resolve({ rows: [] }),
@@ -257,10 +268,20 @@ export async function executeGenericAgentRun(
         [context.user_id],
       ),
     ]);
-    const conversationSummary = conversationResult.rows.reverse()
-      .map((row) => `${row.role}: ${String(row.content).slice(0, 1_000)}`)
-      .join('\n')
-      .slice(-8_000);
+    const orderedMessages = conversationResult.rows.reverse();
+    const recentMessages = [] as Array<{ id: string; role: 'user' | 'assistant'; content: string }>;
+    let remainingContextCharacters = 96_000;
+    for (const row of [...orderedMessages].reverse()) {
+      const content = String(row.content).slice(0, 4_000);
+      if (content.length > remainingContextCharacters) break;
+      recentMessages.unshift({ id: row.id, role: row.role, content });
+      remainingContextCharacters -= content.length;
+    }
+    const conversationSummary = [context.thread_summary || '', ...recentMessages.map((row) => `${row.role}: ${row.content}`)]
+      .filter(Boolean).join('\n').slice(-96_000);
+    const persistedContext = context.thread_context && typeof context.thread_context === 'object'
+      ? context.thread_context as { collectedContext?: Record<string, unknown>; originalGoal?: string; activeTutorTopic?: string }
+      : {};
     const confirmedMemories = Object.fromEntries(memoriesResult.rows.map((row) => [
       row.memory_key,
       typeof row.memory_value === 'string' ? row.memory_value : JSON.stringify(row.memory_value),
@@ -304,22 +325,34 @@ export async function executeGenericAgentRun(
         existingPlan,
         completedLogicalTaskIds,
         conversationSummary,
+        conversationMessages: recentMessages,
+        collectedContext: persistedContext.collectedContext || {},
+        originalGoal: persistedContext.originalGoal || context.message_content || '',
+        latestUserMessage: recentMessages.filter((message) => message.role === 'user').at(-1)?.content || context.message_content || '',
+        activeTutorTopic: persistedContext.activeTutorTopic || null,
         confirmedMemories,
         existingLoad,
         detectedConflicts: context.trigger_context?.conflicts || [],
       }),
       coordinate: async (state) => context.trigger_type === 'assignment_form' || context.trigger_context?.shadow
-        ? { intent: 'initial_plan', assignmentId: context.assignment_id, missingFields: [], responseMode: 'plan' }
+        ? { intent: 'publish_initial_plan', assignmentId: context.assignment_id, missingFields: [], responseMode: 'plan' }
         : context.run_type === 'repair' || context.trigger_type === 'schedule_health'
-          ? { intent: 'repair', assignmentId: context.assignment_id, missingFields: [], responseMode: 'plan' }
+          ? { intent: 'repair_plan', assignmentId: context.assignment_id, missingFields: [], responseMode: 'plan' }
         : specialists
           ? specialists.coordinate(state)
-          : {
-            intent: 'read_only', assignmentId: context.assignment_id, missingFields: [], responseMode: 'answer',
-            answer: 'Conversational planning is temporarily unavailable. You can still create a plan with the assignment form.',
-          },
+          : Promise.reject(Object.assign(new Error('Conversational model execution is unavailable.'), { code: 'MODEL_UNAVAILABLE' })),
       materializeAssignment: async (state) => {
-        const normalized = CreateAssignmentRequestSchema.parse(state.intent?.normalizedAssignment);
+        const supplied = { ...state.collectedContext, ...state.intent?.contextDelta, ...state.intent?.normalizedAssignment };
+        if (!supplied.dueDate) {
+          throw Object.assign(new Error('A due date is required before scheduling persistent work.'), { code: 'ASSIGNMENT_DUE_DATE_REQUIRED' });
+        }
+        const normalized = CreateAssignmentRequestSchema.parse({
+          title: supplied.title || supplied.topic || state.originalGoal.trim().slice(0, 120) || 'Study plan',
+          description: supplied.description || supplied.learningGoal || state.originalGoal,
+          complexity: supplied.complexity || 'Medium',
+          dueDate: supplied.dueDate,
+          totalItems: supplied.totalItems || 6,
+        });
         const client = await db.connect();
         try {
           await client.query('BEGIN');
@@ -424,7 +457,7 @@ export async function executeGenericAgentRun(
         if (!state.candidatePlan || !state.assignmentId) throw new Error('A candidate plan is required.');
         const method = state.shadowMode
           ? planVersions.createDraft.bind(planVersions)
-          : state.intent?.intent === 'repair' || state.existingPlanVersionId
+          : state.intent?.intent === 'repair_plan' || state.existingPlanVersionId
           ? planVersions.createRepairDraft.bind(planVersions)
           : planVersions.createDraft.bind(planVersions);
         const saved = await method({
@@ -464,7 +497,7 @@ export async function executeGenericAgentRun(
         : state.approvalDecision?.decision === 'reject'
           ? 'The proposed plan changes were rejected. Your published plan was not changed.'
         : state.intent?.answer || (state.intent?.responseMode === 'question'
-          ? `I need: ${state.intent.missingFields.join(', ')}.`
+          ? state.intent.clarificationQuestion || 'What detail would help me continue?'
         : state.usingFallback || fallbackReason
           ? 'Your plan is ready. A deterministic fallback was used.'
           : 'Your plan is ready.'),
@@ -502,7 +535,7 @@ export async function executeGenericAgentRun(
         signal: AbortSignal.timeout(10 * 60 * 1000),
       });
       const interrupts = '__interrupt__' in result
-        ? result.__interrupt__ as Array<{ value?: { type?: string; missingFields?: string[] } }>
+        ? result.__interrupt__ as Array<{ value?: { type?: string; missingFields?: string[]; question?: string } }>
         : [];
       if (pendingResume) {
         await db.query(
@@ -516,7 +549,7 @@ export async function executeGenericAgentRun(
         const status = waitingForApproval ? 'waiting_for_approval' : 'waiting_for_input';
         const safeDetail = waitingForApproval
           ? 'A plan change is waiting for student approval.'
-          : `More information is required${interrupts[0]?.value?.missingFields?.length ? `: ${interrupts[0].value.missingFields.join(', ')}` : '.'}`;
+          : 'The assistant is waiting for one clarification.';
         await db.query(
           `UPDATE agent_runs SET status = $2, current_step = $2, updated_at = CURRENT_TIMESTAMP
            WHERE id = $1 AND status = 'running' AND cancellation_requested_at IS NULL`,
@@ -527,7 +560,17 @@ export async function executeGenericAgentRun(
           await db.query(
             `INSERT INTO agent_messages (id, thread_id, user_id, role, content)
              VALUES ($1, $2, $3, 'assistant', $4)`,
-            [crypto.randomUUID(), context.thread_id, context.user_id, safeDetail],
+            [crypto.randomUUID(), context.thread_id, context.user_id,
+              waitingForApproval ? safeDetail : interrupts[0]?.value?.question || 'What detail would help me continue?'],
+          );
+          await db.query(
+            `UPDATE agent_threads SET context_state=$2::jsonb,context_version=context_version+1,
+             last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$3`,
+            [context.thread_id, JSON.stringify({
+              originalGoal: result.originalGoal,
+              collectedContext: result.collectedContext,
+              activeTutorTopic: result.activeTutorTopic,
+            }), context.user_id],
           );
         }
         if (reservationActive) await budget.finalizeAgentRunBudget({ agentRunId: runId, status: 'released' });
@@ -557,10 +600,12 @@ export async function executeGenericAgentRun(
           [crypto.randomUUID(), context.thread_id, context.user_id, result.finalResponse],
         );
         await db.query(
-          `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,
+          `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,context_state=$4::jsonb,
+           context_version=context_version+1,
            last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
            WHERE id=$1 AND user_id=$3`,
-          [context.thread_id, `${conversationSummary}\nassistant: ${result.finalResponse}`.slice(-4_000), context.user_id],
+          [context.thread_id, `${conversationSummary}\nassistant: ${result.finalResponse}`.slice(-16_000), context.user_id,
+            JSON.stringify({ originalGoal: result.originalGoal, collectedContext: result.collectedContext, activeTutorTopic: result.activeTutorTopic })],
         );
       }
       if (result.intent?.preferenceProposal) {

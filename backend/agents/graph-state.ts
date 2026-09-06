@@ -6,15 +6,30 @@ const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('./runtime-registry.js'
   PROMPT_BUNDLE_VERSION: string;
 };
 
-export type IntentEnvelope = {
-  intent: 'initial_plan' | 'repair' | 'read_only' | 'clarify';
+export type ConversationMessage = { id: string; role: 'user' | 'assistant'; content: string };
+export type CollectedContext = {
+  title?: string;
+  description?: string;
+  complexity?: 'Easy' | 'Medium' | 'Hard';
+  dueDate?: string;
+  totalItems?: number;
+  topic?: string;
+  learningGoal?: string;
+  sourceMessageIds?: string[];
+};
+
+export type AssistantDecision = {
+  intent: 'tutor' | 'answer' | 'draft_plan' | 'publish_initial_plan' | 'repair_plan' | 'break_down_task' | 'schedule_query' | 'clarify';
   assignmentId: number | null;
   missingFields: string[];
   responseMode: 'plan' | 'answer' | 'question';
-  normalizedAssignment?: Omit<AssignmentSnapshot, 'id'>;
+  contextDelta?: Omit<CollectedContext, 'sourceMessageIds'>;
+  normalizedAssignment?: Partial<Omit<AssignmentSnapshot, 'id'>>;
+  clarificationQuestion?: string;
   answer?: string;
   preferenceProposal?: { key: string; value: string };
 };
+export type IntentEnvelope = AssistantDecision;
 
 export type ReviewResult = {
   accept: boolean;
@@ -53,6 +68,12 @@ export const DisciplanGraphState = Annotation.Root({
   graphVersion: Annotation<string>,
   promptBundleVersion: Annotation<string>,
   userRequest: Annotation<string>,
+  originalGoal: Annotation<string>,
+  latestUserMessage: Annotation<string>,
+  conversationMessages: Annotation<ConversationMessage[]>,
+  collectedContext: Annotation<CollectedContext>,
+  activeTutorTopic: Annotation<string | null>,
+  pendingClarification: Annotation<{ question: string; missingFields: string[] } | null>,
   conversationSummary: Annotation<string>,
   confirmedMemories: Annotation<Record<string, string>>,
   intent: Annotation<IntentEnvelope | null>,
@@ -96,6 +117,12 @@ export const createInitialGraphState = (input: Pick<DisciplanState,
   graphVersion: input.graphVersion ?? GRAPH_VERSION,
   promptBundleVersion: input.promptBundleVersion ?? PROMPT_BUNDLE_VERSION,
   userRequest: input.userRequest,
+  originalGoal: input.originalGoal ?? input.userRequest,
+  latestUserMessage: input.latestUserMessage ?? input.userRequest,
+  conversationMessages: input.conversationMessages ?? [],
+  collectedContext: input.collectedContext ?? {},
+  activeTutorTopic: input.activeTutorTopic ?? null,
+  pendingClarification: input.pendingClarification ?? null,
   conversationSummary: input.conversationSummary ?? '',
   confirmedMemories: input.confirmedMemories ?? {},
   intent: input.intent ?? null,

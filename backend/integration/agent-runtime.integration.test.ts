@@ -277,7 +277,7 @@ describe.skipIf(!enabled)('agent runtime Postgres integration', () => {
         planningProfile: { timezone: 'UTC', weekdayAvailableMinutes: { 1: 60 }, maxDailyMinutes: 60, preferredSessionMinutes: 30, version: 1 },
       }),
       coordinate: async (state) => state.userRequest.includes('due November')
-        ? { intent: 'initial_plan', assignmentId: 1, missingFields: [], responseMode: 'plan' }
+        ? { intent: 'publish_initial_plan', assignmentId: 1, missingFields: [], responseMode: 'plan' }
         : { intent: 'clarify', assignmentId: 1, missingFields: ['dueDate'], responseMode: 'question' },
       materializeAssignment: async () => ({ assignmentId: 1 }),
       createPlan: async () => ({ draft: {
