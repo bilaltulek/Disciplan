@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bot, Loader2, MessageSquarePlus, Send } from 'lucide-react';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import DashboardNav from '@/components/layout/DashboardNav';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -8,12 +10,45 @@ import { apiRequest } from '@/shared/api/client';
 import type { RuntimeCapabilities } from '@/shared/api/types';
 
 type Thread = { id: string; title: string | null; last_activity_at: string };
-type Message = { id: string; role: 'user' | 'assistant' | 'system'; content: string; created_at: string };
-type Run = { id: string; status: string; current_step?: string };
+type MessageMetadata = {
+  kind?: 'answer' | 'tutor' | 'clarification' | 'plan' | 'proposal' | 'failure';
+  runId?: string;
+  citations?: Array<{ title: string; url: string }>;
+  suggestedActions?: Array<{ label: string; prompt: string }>;
+  planSource?: 'agentic' | 'fallback';
+};
+type Message = { id: string; role: 'user' | 'assistant' | 'system'; content: string; content_metadata?: MessageMetadata; created_at: string };
+type Run = { id: string; status: string; current_step?: string; failure_message?: string | null };
 type ApprovalItem = { logical_task_id: string; task_description: string; scheduled_date: string; estimated_minutes: number; operation: string };
 type Approval = { id: string; run_id: string; assignment_title: string; proposal_hash: string; rationale: string | null; items: ApprovalItem[] };
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'waiting_for_input', 'waiting_for_approval']);
+const safeUrl = (url: string) => {
+  try { return new URL(url).protocol === 'https:' ? defaultUrlTransform(url) : ''; } catch { return ''; }
+};
+
+function AssistantMessage({ message, onAction }: { message: Message; onAction: (prompt: string) => void }) {
+  const user = message.role === 'user';
+  return <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${user ? 'ml-auto bg-primary text-primary-foreground whitespace-pre-wrap' : 'bg-muted text-foreground'}`}>
+    {user ? message.content : <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrl} components={{
+      a: ({ children, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="underline text-primary">{children}</a>,
+      ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
+      ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+      code: ({ children }) => <code className="rounded bg-background/70 px-1 py-0.5 font-mono text-xs">{children}</code>,
+      p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>,
+    }}>{message.content}</ReactMarkdown>}
+    {!user && message.content_metadata?.citations?.length ? <div className="mt-3 border-t pt-2">
+      <p className="text-xs font-semibold text-muted-foreground">Verified resources</p>
+      <ul className="mt-1 space-y-1">{message.content_metadata.citations.map((citation) => <li key={citation.url}>
+        <a href={safeUrl(citation.url)} target="_blank" rel="noopener noreferrer" className="text-primary underline">{citation.title}</a>
+      </li>)}</ul>
+    </div> : null}
+    {!user && message.content_metadata?.suggestedActions?.length ? <div className="mt-3 flex flex-wrap gap-2">
+      {message.content_metadata.suggestedActions.map((action) => <Button key={`${action.label}-${action.prompt}`} type="button" variant="outline" size="sm" onClick={() => onAction(action.prompt)}>{action.label}</Button>)}
+    </div> : null}
+    {!user && message.content_metadata?.planSource === 'fallback' ? <p className="mt-2 text-xs text-amber-700">A deterministic fallback plan was used.</p> : null}
+  </div>;
+}
 
 export default function Assistant() {
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -114,13 +149,28 @@ export default function Assistant() {
       const response = await apiRequest<{ run: Run }>(`/api/agent-threads/${threadId}/messages`, {
         method: 'POST',
         headers: { 'Idempotency-Key': crypto.randomUUID() },
-        body: JSON.stringify({ content, clientMessageId }),
+        body: JSON.stringify({
+          content,
+          clientMessageId,
+          ...(activeRun?.status === 'waiting_for_input' ? { replyToRunId: activeRun.id } : {}),
+        }),
       });
       setActiveRun(response.run);
     } catch (sendError) {
       setDraft(content);
       setError(sendError instanceof Error ? sendError.message : 'Message could not be sent.');
       await loadConversation(threadId);
+    }
+  };
+
+  const retryRun = async () => {
+    if (!activeRun || activeRun.status !== 'failed') return;
+    setError('');
+    try {
+      const response = await apiRequest<{ run: Run }>(`/api/agent-runs/${activeRun.id}/retry`, { method: 'POST' });
+      setActiveRun(response.run);
+    } catch (retryError) {
+      setError(retryError instanceof Error ? retryError.message : 'The assistant response could not be retried.');
     }
   };
 
@@ -141,8 +191,8 @@ export default function Assistant() {
       <Card className="flex min-h-0 flex-col overflow-hidden">
         <header className="border-b p-4 flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /><h1 className="font-semibold">Disciplan Assistant</h1></header>
         <section aria-live="polite" className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.length === 0 && <div className="text-center text-muted-foreground py-16"><p className="font-medium">What should we plan?</p><p className="text-sm mt-1">Describe an assignment, a missed study day, or ask about your schedule.</p></div>}
-          {messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${message.role === 'user' ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>{message.content}</div>)}
+          {messages.length === 0 && <div className="text-center text-muted-foreground py-16"><p className="font-medium">What would you like to learn or plan?</p><p className="text-sm mt-1">Ask for an explanation, a guided study session, resources, a task breakdown, or a schedule.</p></div>}
+          {messages.map((message) => <AssistantMessage key={message.id} message={message} onAction={setDraft} />)}
           {approvals.map((approval) => <Card key={approval.id} className="p-4 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
             <h2 className="font-semibold">Review changes for {approval.assignment_title}</h2>
             {approval.rationale && <p className="text-sm text-muted-foreground mt-1">{approval.rationale}</p>}
@@ -150,11 +200,13 @@ export default function Assistant() {
             <div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => void decideApproval(approval, 'reject')}>Keep current plan</Button><Button onClick={() => void decideApproval(approval, 'approve')}>Approve changes</Button></div>
           </Card>)}
           {activeRun && !TERMINAL.has(activeRun.status) && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> {activeRun.current_step || activeRun.status}</div>}
+          {activeRun?.status === 'waiting_for_input' && <p className="text-sm text-muted-foreground" role="status">Reply below when you are ready. I will keep the context we already discussed.</p>}
+          {activeRun?.status === 'failed' && <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><span>Your message is saved, but the response could not be completed.</span><Button type="button" size="sm" variant="outline" onClick={() => void retryRun()}>Retry</Button></div>}
           {capabilities && !capabilities.conversationalPlanning && <p className="text-sm text-muted-foreground" role="status">Conversational planning is not enabled in this environment. You can still create a deterministic plan from the Dashboard.</p>}
           {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
         </section>
         <form className="border-t p-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-          <Textarea aria-label="Message Disciplan" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!capabilities?.conversationalPlanning} maxLength={4000} placeholder={capabilities?.conversationalPlanning ? 'Help me plan my research paper due next Friday…' : 'Conversational planning is unavailable'} className="min-h-12 max-h-32" />
+          <Textarea aria-label="Message Disciplan" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!capabilities?.conversationalPlanning} maxLength={4000} placeholder={capabilities?.conversationalPlanning ? 'Teach me pointers, quiz me on chapter 1, or help me plan…' : 'Conversational planning is unavailable'} className="min-h-12 max-h-32" />
           <Button type="submit" size="icon" disabled={!draft.trim() || !capabilities?.conversationalPlanning} aria-label="Send message"><Send className="w-4 h-4" /></Button>
         </form>
       </Card>

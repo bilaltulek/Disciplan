@@ -6,6 +6,8 @@ export interface RuntimeCapabilities {
   mode: 'off' | 'shadow' | 'active';
   conversationalPlanning: boolean;
   asynchronousFormPlanning: boolean;
+  tutoring: boolean;
+  groundedResources: boolean;
 }
 
 export interface StudyTask {
