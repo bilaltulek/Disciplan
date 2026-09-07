@@ -106,7 +106,7 @@ describe.skipIf(!enabled)('ledgerless prototype reconciliation', () => {
 
     const ledger = await pool.query('SELECT filename FROM schema_migrations ORDER BY filename');
     expect(ledger.rows.map((row) => row.filename)).toContain('002a_ledgerless_prototype_reconciliation.sql');
-    expect(ledger.rows.at(-1)?.filename).toBe('008_plan_feedback.sql');
+    expect(ledger.rows.at(-1)?.filename).toBe('009_conversation_context.sql');
     const preserved = await pool.query(`
       SELECT
         (SELECT COUNT(*)::int FROM users) users,
