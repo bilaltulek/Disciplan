@@ -1,6 +1,7 @@
 import { createInitialGraphState } from '../agents/graph-state.js';
 import { GeminiModelGateway } from '../agents/model-gateway.js';
 import { createSpecialists } from '../agents/specialists.js';
+import { buildScheduleResponse } from '../agents/supervisor-graph.js';
 import { fallbackDraft } from '../agents/fallback-planner.js';
 import type { PlanDraft } from '../../shared/contracts.js';
 import { evaluationDataset } from './dataset.js';
@@ -37,14 +38,12 @@ const main = async () => {
   const hardCostMicroUsd = budget.toMicroUsd(Number.parseFloat(process.env.AGENT_EVAL_MAX_COST_USD || '2'));
   const usage = { modelCalls: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCostMicroUsd: 0 };
   let costLimitReached = false;
-  const gateway = new GeminiModelGateway({
-    apiKey: config.geminiApiKey,
-    modelName: config.geminiModel,
-    maxOutputTokens: config.aiMaxOutputTokens,
-    thinkingBudget: config.aiThinkingBudget,
+  const createGateway = (modelName: string) => new GeminiModelGateway({
+    apiKey: config.geminiApiKey, modelName,
+    maxOutputTokens: config.aiMaxOutputTokens, thinkingBudget: config.aiThinkingBudget,
     onUsage: async ({ usage: callUsage }) => {
       const estimated = budget.estimateCostMicroUsd({
-        model: config.geminiModel,
+        model: modelName,
         promptTokens: callUsage.inputTokens,
         outputTokens: callUsage.outputTokens,
       });
@@ -59,28 +58,35 @@ const main = async () => {
       }
     },
   });
+  const routerGateway = createGateway(config.geminiRouterModel);
+  const agentGateway = createGateway(config.geminiAgentModel);
 
   const outcomes: EvaluationOutcome[] = [];
   const failureCounts: Record<string, number> = {};
   const recoveredFailureCounts: Record<string, number> = {};
   const failures: Array<{
-    id: string; stage: string; code: string; issueCodes: string[]; recovered: boolean;
+    id: string; stage: string; code: string; issueCodes: string[]; recovered: boolean; errorType: string; statusCode: number | null;
   }> = [];
   for (const [caseIndex, item] of selection.cases.entries()) {
     if (costLimitReached) break;
     const dueDate = addDays(today, Math.max(0, item.horizonDays));
-    const assignment = item.expectedIntent === 'clarify' ? null : {
+    const assignment = ['publish_initial_plan', 'repair_plan'].includes(item.expectedIntent) ? {
       id: 1,
       title: `${item.subject} assignment`,
       description: item.assignmentDescription || (item.adversarial ? item.request : ''),
       complexity: item.complexity,
       dueDate,
       totalItems: item.totalItems,
-    };
+    } : null;
     const base = createInitialGraphState({
       runId: crypto.randomUUID(), actorUserId: 1, assignmentId: assignment?.id ?? null,
-      runType: item.expectedIntent === 'repair_plan' ? 'repair' : 'conversation',
-      triggerType: 'user_message', userRequest: item.request,
+      runType: item.expectedIntent === 'repair_plan'
+        ? 'repair'
+        : item.expectedIntent === 'publish_initial_plan'
+          ? 'initial_plan'
+          : 'conversation',
+      triggerType: item.expectedIntent === 'publish_initial_plan' ? 'assignment_form' : 'user_message',
+      userRequest: item.request,
     });
     const state = {
       ...base,
@@ -104,6 +110,10 @@ const main = async () => {
       failures.push({
         id: item.id, stage, code: failureCode,
         issueCodes: evaluationFailureIssueCodes(error), recovered,
+        errorType: error instanceof Error ? error.name.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80) : 'UnknownError',
+        statusCode: typeof (error as { statusCode?: unknown })?.statusCode === 'number'
+          ? (error as { statusCode: number }).statusCode
+          : null,
       });
     };
     const paced = async <T>(operation: () => Promise<T>): Promise<T> => {
@@ -111,20 +121,57 @@ const main = async () => {
       await waitForCanaryPacing(selection.delayMs);
       return result;
     };
+    const isTransientModelFailure = (error: unknown) => [
+      'MODEL_PROVIDER_UNAVAILABLE', 'MODEL_UNAVAILABLE', 'MODEL_QUOTA_EXCEEDED', 'MODEL_TIMEOUT',
+    ].includes(classifyEvaluationFailure(error));
+    const transientBackoff = async (error: unknown, attempt: number) => {
+      const code = classifyEvaluationFailure(error);
+      const base = code === 'MODEL_QUOTA_EXCEEDED' || code === 'MODEL_UNAVAILABLE' ? 15_000 : 5_000;
+      await waitForCanaryPacing(Math.max(selection.delayMs, base * attempt));
+    };
+    const withRuntimeRetries = async <T>(operation: () => Promise<T>): Promise<T> => {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          return await paced(operation);
+        } catch (error) {
+          if (!isTransientModelFailure(error) || attempt === 3) throw error;
+          recordFailure(error, true);
+          await transientBackoff(error, attempt);
+        }
+      }
+      throw Object.assign(new Error('Model retries were exhausted.'), { code: 'MODEL_PROVIDER_UNAVAILABLE' });
+    };
     const coordinateWithRuntimeRetries = async () => {
       for (let attempt = 1; attempt <= 3; attempt += 1) {
-        const attemptSpecialists = createSpecialists(gateway, { maxModelCalls: 5, maxToolCalls: 12 });
+        const attemptSpecialists = createSpecialists(routerGateway, {
+          gatewayForRole: (role) => role === 'coordinator' || role === 'reviewer' ? routerGateway : agentGateway,
+          maxModelCalls: 5, maxToolCalls: 12,
+        });
+        if (state.triggerType === 'assignment_form') {
+          return {
+            intent: {
+              intent: 'publish_initial_plan' as const, assignmentId: state.assignmentId,
+              missingFields: [], responseMode: 'plan' as const,
+            },
+            specialists: attemptSpecialists,
+          };
+        }
+        if (state.runType === 'repair') {
+          return {
+            intent: {
+              intent: 'repair_plan' as const, assignmentId: state.assignmentId,
+              missingFields: [], responseMode: 'plan' as const,
+            },
+            specialists: attemptSpecialists,
+          };
+        }
         try {
           const intent = await paced(() => attemptSpecialists.coordinate(state));
           return { intent, specialists: attemptSpecialists };
         } catch (error) {
-          const code = classifyEvaluationFailure(error);
-          const transient = code === 'MODEL_PROVIDER_UNAVAILABLE'
-            || code === 'MODEL_QUOTA_EXCEEDED'
-            || code === 'MODEL_TIMEOUT';
-          if (!transient || attempt === 3) throw error;
+          if (!isTransientModelFailure(error) || attempt === 3) throw error;
           recordFailure(error, true);
-          await waitForCanaryPacing(Math.max(3_000, selection.delayMs));
+          await transientBackoff(error, attempt);
         }
       }
       throw Object.assign(new Error('Coordinator retries were exhausted.'), { code: 'MODEL_PROVIDER_UNAVAILABLE' });
@@ -202,7 +249,31 @@ const main = async () => {
           tasks: tasksForValidation(draft.tasks), assignment, profile: state.planningProfile, existingLoad: {},
           existingPlan: state.existingPlan, completedLogicalTaskIds: [],
         });
+        if (invariantViolations.length > 0) {
+          draft = fallbackDraft({ ...state, intent, deterministicIssues: invariantViolations });
+          invariantViolations = validatePlan({
+            tasks: tasksForValidation(draft.tasks), assignment, profile: state.planningProfile, existingLoad: {},
+            existingPlan: state.existingPlan, completedLogicalTaskIds: [],
+          });
+        }
         semanticPass = semanticPass && draft.tasks.length > 0;
+      } else if (intent.intent === 'schedule_query') {
+        stage = 'schedule';
+        const response = buildScheduleResponse({ ...state, intent });
+        const normalized = response.answer.toLowerCase();
+        semanticPass = semanticPass
+          && (item.expectedResponseTerms || []).every((term) => normalized.includes(term.toLowerCase()));
+      } else if (intent.intent !== 'clarify') {
+        stage = 'tutor';
+        const response = await withRuntimeRetries(() => specialists.tutor({ ...state, intent }));
+        const normalized = response.answer.toLowerCase();
+        semanticPass = semanticPass
+          && intent.missingFields.length === 0
+          && response.answer.trim().length >= 40
+          && (item.expectedResponseTerms || []).every((term) => normalized.includes(term.toLowerCase()))
+          && !/\b(totalitems|duedate|complexity)\b/i.test(response.answer);
+      } else {
+        semanticPass = semanticPass && intent.missingFields.length > 0 && Boolean(intent.clarificationQuestion);
       }
       outcomes.push({
         id: item.id, actualIntent: intent.intent, schemaValid,

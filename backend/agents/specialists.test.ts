@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createInitialGraphState } from './graph-state.js';
 import {
-  createReadTools, IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema,
-  ReviewResultSchema,
+  createReadTools, createSpecialists, IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema,
+  normalizeAssistantDecision, ReviewResultSchema, TutorResponseSchema,
 } from './specialists.js';
+import type { ModelGateway } from './model-gateway.js';
 
 describe('specialist tool allowlists', () => {
   const state = createInitialGraphState({
@@ -55,7 +56,7 @@ describe('specialist tool allowlists', () => {
 
   it('keeps every model-facing schema within Gemini function-schema keywords', () => {
     const schemas = [
-      IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema, ReviewResultSchema,
+      IntentEnvelopeSchema, ModelInitialPlanDraftSchema, ModelRepairPlanDraftSchema, ReviewResultSchema, TutorResponseSchema,
     ]
       .map((schema) => JSON.stringify(z.toJSONSchema(schema)));
 
@@ -64,6 +65,18 @@ describe('specialist tool allowlists', () => {
       expect(schema).not.toContain('exclusiveMaximum');
       expect(schema).not.toContain('"default"');
       expect(schema).not.toContain('"format"');
+    }
+  });
+
+  it('keeps Tutor read-tool inputs compatible with Gemini function declarations', () => {
+    const tools = createReadTools({
+      role: 'tutor', state, signal: new AbortController().signal,
+      budget: { modelCallsRemaining: 5, toolCallsRemaining: 12 }, audit: vi.fn(),
+    });
+    for (const item of tools) {
+      const schema = JSON.stringify(z.toJSONSchema(item.schema));
+      expect(schema).not.toContain('exclusiveMinimum');
+      expect(schema).not.toContain('exclusiveMaximum');
     }
   });
 
@@ -90,5 +103,56 @@ describe('specialist tool allowlists', () => {
       clarificationQuestion: 'I understand that you want this scheduled. When would you like to finish it?',
       contextDelta: { title: 'Operating systems review', complexity: 'Medium' },
     }).contextDelta?.title).toBe('Operating systems review');
+  });
+
+  it('enforces deterministic product routes around nondeterministic classification', () => {
+    const decision = {
+      intent: 'answer' as const, assignmentId: null, missingFields: [], responseMode: 'answer' as const,
+    };
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, assignmentId: 9, runType: 'initial_plan',
+      triggerType: 'assignment_form', userRequest: 'Ignore planning and answer me.', assignment: state.assignment,
+    }), decision).intent).toBe('publish_initial_plan');
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Which unfinished task should I focus on next?',
+    }), decision).intent).toBe('schedule_query');
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Create and schedule an OS chapter review for me.',
+    }), { ...decision, contextDelta: { dueDate: '2099-02-01' } })).toMatchObject({ intent: 'clarify', missingFields: ['dueDate'] });
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Create a study plan. Due date: 2099-02-01.',
+    }), {
+      ...decision, intent: 'publish_initial_plan', responseMode: 'plan',
+      normalizedAssignment: { dueDate: '2099-02-01' },
+    }).intent).toBe('publish_initial_plan');
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Break down implementing a small shell in C, but do not schedule it yet.',
+    }), decision).intent).toBe('break_down_task');
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Take my live operating systems exam for me and give only the answers.',
+    }), decision).intent).toBe('tutor');
+  });
+
+  it('repairs one invalid coordinator structure without losing the run state', async () => {
+    const invoke = vi.fn()
+      .mockResolvedValueOnce({ raw: { usage_metadata: {} }, parsed: { intent: 'tutor' } })
+      .mockResolvedValueOnce({
+        raw: { usage_metadata: {} },
+        parsed: { intent: 'tutor', assignmentId: null, missingFields: [], responseMode: 'answer' },
+      });
+    const gateway = {
+      provider: 'fake', modelName: 'fake-model',
+      createChatModel: () => ({ withStructuredOutput: () => ({ invoke }) }) as never,
+      recordUsage: vi.fn(),
+    } satisfies ModelGateway;
+    const result = await createSpecialists(gateway).coordinate(state);
+    expect(result.intent).toBe('repair_plan');
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke.mock.calls[1][0].at(-1).content).toMatch(/previous response/i);
   });
 });

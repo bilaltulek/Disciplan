@@ -189,10 +189,56 @@ const createFormPlan = async ({ title, description, totalItems, dueInDays, topic
   summary.formRuns.push({ ...evidence, assignmentId: accepted.id, taskCount: tasks.length, topicCoverage: true });
 };
 
-const sendMessage = (threadId, content) => requireStatus(request({
+const sendMessage = (threadId, content, replyToRunId) => requireStatus(request({
   method: 'POST', pathname: `/api/agent-threads/${threadId}/messages`,
-  idempotencyKey: crypto.randomUUID(), body: { content, clientMessageId: crypto.randomUUID() },
+  idempotencyKey: crypto.randomUUID(), body: {
+    content, clientMessageId: crypto.randomUUID(), ...(replyToRunId ? { replyToRunId } : {}),
+  },
 }), 202, 'Assistant message');
+
+const assistantEvidence = async (threadId, run, expectedKind) => {
+  if (run.status !== 'succeeded' || run.plan_source !== 'agentic') {
+    throw new Error(`Assistant ${expectedKind} ended as ${run.status}/${run.plan_source || 'no-source'}.`);
+  }
+  const evidence = await pool.query(
+    `SELECT r.provider_run_id,r.model_provider,r.model_name,r.graph_version,r.prompt_bundle_version,
+            usage.usage_events,usage.total_tokens,events.graph_started
+     FROM agent_runs r
+     CROSS JOIN LATERAL (
+       SELECT COUNT(*)::int AS usage_events,COALESCE(SUM(total_tokens),0)::int AS total_tokens
+       FROM ai_usage_events WHERE agent_run_id=r.id AND status='allowed'
+     ) usage
+     CROSS JOIN LATERAL (
+       SELECT BOOL_OR(detail_code='RUN_STARTED') AS graph_started
+       FROM agent_run_events WHERE run_id=r.id
+     ) events
+     WHERE r.id=$1
+    `,
+    [run.id],
+  );
+  const row = evidence.rows[0];
+  const eventCodes = (await pool.query(
+    'SELECT detail_code FROM agent_run_events WHERE run_id=$1 AND detail_code IS NOT NULL ORDER BY id',
+    [run.id],
+  )).rows.map((item) => item.detail_code);
+  const thread = requireStatus(request({ pathname: `/api/agent-threads/${threadId}` }), 200, 'Assistant thread');
+  const message = [...thread.messages].reverse().find((item) => item.role === 'assistant' && item.content_metadata?.runId === run.id);
+  if (!row?.provider_run_id || !row.graph_started || row.model_provider !== 'gemini'
+      || row.usage_events < 1 || row.total_tokens < 1 || message?.content_metadata?.kind !== expectedKind) {
+    throw new Error(`Assistant run ${run.id} did not prove Trigger/LangGraph/Gemini ${expectedKind} execution.`);
+  }
+  if (/temporarily unavailable|deterministic fallback/i.test(message.content)) {
+    throw new Error(`Assistant run ${run.id} returned an unavailable/fallback response during a healthy request.`);
+  }
+  return {
+    runId: run.id, providerRunId: row.provider_run_id, modelProvider: row.model_provider,
+    modelName: row.model_name, graphVersion: row.graph_version,
+    promptBundleVersion: row.prompt_bundle_version, usageEvents: row.usage_events,
+    totalTokens: row.total_tokens, responseKind: message.content_metadata.kind,
+    citationCount: Array.isArray(message.content_metadata.citations) ? message.content_metadata.citations.length : 0,
+    eventCodes,
+  };
+};
 
 const run = async () => {
   requireStatus(request({ pathname: '/api/health' }), 200, 'Health');
@@ -215,39 +261,60 @@ const run = async () => {
     throw new Error('Vercel Preview does not expose active agent capabilities.');
   }
   summary.capabilities = capabilities;
+  if (!capabilities.tutoring) throw new Error('Vercel Preview does not expose tutoring capability.');
 
-  if (!process.argv.includes('--assistant-only')) await createFormPlan({
+  const skipForms = process.argv.includes('--assistant-only') || process.argv.includes('--resources-only');
+  if (!skipForms) await createFormPlan({
     title: 'OS chapter 1', dueInDays: 10, totalItems: 7,
     description: 'Refresh C syntax and C concepts for operating systems, including pointers, memory, processes, and fork(), while studying OS chapter 1.',
     topicGroups: [['c syntax'], ['pointer'], ['fork'], ['operating system', 'os chapter'], ['memory'], ['process']],
   });
-  if (!process.argv.includes('--assistant-only')) await createFormPlan({
+  if (!skipForms) await createFormPlan({
     title: 'Atlantic Slave Trade history review', dueInDays: 12, totalItems: 7,
     description: 'Study the triangular trade, Middle Passage, economic motives, resistance, abolition, and long-term consequences of the Atlantic slave trade.',
     topicGroups: [['triangular trade'], ['middle passage'], ['economic'], ['resistance'], ['abolition'], ['consequence']],
   });
-  if (!process.argv.includes('--assistant-only')) await createFormPlan({
+  if (!skipForms) await createFormPlan({
     title: 'Cellular respiration exam review', dueInDays: 9, totalItems: 6,
     description: 'Review glycolysis, the Krebs cycle, electron transport chain, ATP yield, and aerobic versus anaerobic respiration.',
     topicGroups: [['glycolysis'], ['krebs'], ['electron transport'], ['atp'], ['aerobic'], ['anaerobic']],
   });
 
-  const normalThread = requireStatus(request({ method: 'POST', pathname: '/api/agent-threads', body: { title: 'Biology planning' } }), 201, 'Thread creation').thread;
-  const normalAccepted = sendMessage(
-    normalThread.id,
-    `Create a study plan. Title: Cellular Biology Exam. Description: Review mitosis, meiosis, DNA replication, transcription, translation, and genetic variation. Complexity: Medium. Due date: ${isoDateAfter(11)}. Total items: 6.`,
-  );
-  const normalRun = await waitForRun(normalAccepted.run.id);
-  await assertAgentic(normalRun, 'Normal Assistant plan');
-  summary.conversationRuns.push({ kind: 'normal', ...await executionEvidence(normalRun.id) });
+  const resourcesOnly = process.argv.includes('--resources-only');
+  if (!resourcesOnly) {
+    const normalThread = requireStatus(request({ method: 'POST', pathname: '/api/agent-threads', body: { title: 'Biology planning' } }), 201, 'Thread creation').thread;
+    const normalAccepted = sendMessage(
+      normalThread.id,
+      `Create a study plan. Title: Cellular Biology Exam. Description: Review mitosis, meiosis, DNA replication, transcription, translation, and genetic variation. Complexity: Medium. Due date: ${isoDateAfter(11)}. Total items: 6.`,
+    );
+    const normalRun = await waitForRun(normalAccepted.run.id);
+    await assertAgentic(normalRun, 'Normal Assistant plan');
+    summary.conversationRuns.push({ kind: 'normal', ...await executionEvidence(normalRun.id) });
 
+    const tutorThread = requireStatus(request({ method: 'POST', pathname: '/api/agent-threads', body: { title: 'Pointers tutoring' } }), 201, 'Tutor thread creation').thread;
+    const tutorAccepted = sendMessage(tutorThread.id, 'Teach me pointers in C with a small example, then ask me one question to check my understanding.');
+    const tutorRun = await waitForRun(tutorAccepted.run.id);
+    summary.conversationRuns.push({ kind: 'tutor', ...await assistantEvidence(tutorThread.id, tutorRun, 'tutor') });
+  }
+
+  const resourceThread = requireStatus(request({ method: 'POST', pathname: '/api/agent-threads', body: { title: 'Grounded resources' } }), 201, 'Resource thread creation').thread;
+  const resourceAccepted = sendMessage(resourceThread.id, 'Teach me the basics of C pointers and find two trustworthy learning resources with verified links.');
+  const resourceRun = await waitForRun(resourceAccepted.run.id);
+  const resourceEvidence = await assistantEvidence(resourceThread.id, resourceRun, 'tutor');
+  if (resourceEvidence.citationCount < 1) {
+    throw new Error(`Grounded Assistant response returned no verified citations (${resourceEvidence.eventCodes.join(',')}).`);
+  }
+  summary.conversationRuns.push({ kind: 'resources', ...resourceEvidence });
+
+  if (!resourcesOnly) {
   const clarificationThread = requireStatus(request({ method: 'POST', pathname: '/api/agent-threads', body: { title: 'History clarification' } }), 201, 'Clarification thread creation').thread;
-  const clarificationAccepted = sendMessage(clarificationThread.id, 'Help me plan a review of Reconstruction after the Civil War.');
+  const clarificationAccepted = sendMessage(clarificationThread.id, 'Create and schedule a review of Reconstruction after the Civil War, covering emancipation, the Freedmen\'s Bureau, the Reconstruction amendments, Black political participation, resistance, and the end of Reconstruction.');
   const waiting = await waitForRun(clarificationAccepted.run.id, { allowWaitingForInput: true });
   if (waiting.status !== 'waiting_for_input') throw new Error(`Clarification request ended as ${waiting.status} instead of waiting_for_input.`);
   const resumed = sendMessage(
     clarificationThread.id,
-    `It is due ${isoDateAfter(13)}, Medium difficulty, and I want six study sessions covering emancipation, the Freedmen's Bureau, Reconstruction amendments, Black political participation, resistance, and the end of Reconstruction.`,
+    `It is due ${isoDateAfter(13)}.`,
+    waiting.id,
   );
   if (resumed.run.id !== waiting.id) throw new Error('Clarification created a new run instead of resuming the waiting run.');
   const resumedRun = await waitForRun(resumed.run.id);
@@ -257,6 +324,7 @@ const run = async () => {
     throw new Error('Clarification run has no persisted CLARIFICATION_REQUIRED event.');
   }
   summary.conversationRuns.push({ kind: 'clarification_resume', clarificationPersisted: true, ...await executionEvidence(resumedRun.id) });
+  }
 
   requireStatus(request({ method: 'DELETE', pathname: '/api/account', body: { password } }), 200, 'Account deletion');
   accountRegistered = false;

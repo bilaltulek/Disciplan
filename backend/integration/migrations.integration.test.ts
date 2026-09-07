@@ -37,6 +37,6 @@ describe.skipIf(!enabled)('Postgres migration integration', () => {
     );
     expect(tables.rows).toHaveLength(4);
     const ledger = await pool.query('SELECT filename FROM schema_migrations ORDER BY filename');
-    expect(ledger.rows.at(-1)?.filename).toBe('008_plan_feedback.sql');
+    expect(ledger.rows.at(-1)?.filename).toBe('009_conversation_context.sql');
   }, 120_000);
 });

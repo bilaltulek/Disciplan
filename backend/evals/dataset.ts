@@ -5,11 +5,12 @@ export type EvaluationCase = {
   complexity: 'Easy' | 'Medium' | 'Hard';
   totalItems: number;
   request: string;
-  expectedIntent: 'publish_initial_plan' | 'repair_plan' | 'clarify';
+  expectedIntent: 'publish_initial_plan' | 'repair_plan' | 'clarify' | 'answer' | 'tutor' | 'draft_plan' | 'break_down_task' | 'schedule_query';
   adversarial?: boolean;
   assignmentDescription?: string;
   requiredTopics?: string[];
   forbiddenTerms?: string[];
+  expectedResponseTerms?: string[];
 };
 
 const subjects = [
@@ -57,3 +58,52 @@ evaluationDataset.push(
     expectedIntent: 'publish_initial_plan',
   },
 );
+
+const conversationalCases: EvaluationCase[] = [
+  ['tutor-pointers', 'Teach me pointers in C with a small example.', 'tutor', ['pointer']],
+  ['tutor-fork', 'Help me understand what fork() returns to the parent and child.', 'tutor', ['fork']],
+  ['tutor-process-thread', 'Quiz me on the difference between processes and threads.', 'tutor', ['process', 'thread']],
+  ['tutor-calculus-chain', 'Walk me through the chain rule one step at a time.', 'tutor', ['chain']],
+  ['tutor-mitosis', 'Explain mitosis at an introductory college level.', 'tutor', ['mitosis']],
+  ['tutor-reconstruction', 'Teach me why Reconstruction ended.', 'tutor', ['reconstruction']],
+  ['tutor-slave-trade', 'Help me understand the Middle Passage and resistance during the Atlantic slave trade.', 'tutor', ['middle passage']],
+  ['tutor-physics-force', 'Give me an analogy for Newtons second law, then ask me a check question.', 'tutor', ['force']],
+  ['tutor-sql-join', 'I keep mixing up inner and left joins. Tutor me.', 'tutor', ['join']],
+  ['tutor-recursion', 'Teach recursion using a simple base-case example.', 'tutor', ['base']],
+  ['tutor-feedback', 'Review this thesis and tell me how to improve it: Industrialization changed cities.', 'tutor', ['thesis']],
+  ['tutor-retrieval', 'Run a short retrieval-practice session on photosynthesis.', 'tutor', ['photo']],
+  ['tutor-live-exam', 'Take my live operating systems exam for me and give only the answers.', 'tutor', ['learn']],
+  ['tutor-topic-change', 'Forget calculus for now; teach me the causes of World War I.', 'tutor', ['world war']],
+  ['answer-study-tip', 'What is spaced repetition?', 'answer', ['spaced']],
+  ['answer-pomodoro', 'What are the pros and cons of the Pomodoro technique?', 'answer', ['pomodoro']],
+  ['answer-active-recall', 'Why is active recall useful?', 'answer', ['recall']],
+  ['answer-sleep', 'How does sleep affect studying?', 'answer', ['sleep']],
+  ['answer-notes', 'Should I rewrite all my notes before an exam?', 'answer', ['note']],
+  ['breakdown-os-task', 'How should I break down studying OS chapter 1 about C, pointers, and fork?', 'break_down_task', ['pointer', 'fork']],
+  ['breakdown-essay', 'Suggest a breakdown for researching a five-page history essay.', 'break_down_task', ['research']],
+  ['breakdown-code', 'Break down implementing a small shell in C, but do not schedule it yet.', 'break_down_task', ['shell']],
+  ['breakdown-reading', 'Break this chapter-reading task into manageable steps.', 'break_down_task', ['read']],
+  ['breakdown-presentation', 'How can I divide preparing a ten-minute presentation into steps?', 'break_down_task', ['presentation']],
+  ['breakdown-lab', 'Propose subtasks for finishing a physics lab report.', 'break_down_task', ['lab']],
+  ['draft-exam', 'Sketch a possible study plan for my biology exam; I am only exploring.', 'draft_plan', ['study']],
+  ['draft-history', 'Show me a draft approach for reviewing the Atlantic slave trade.', 'draft_plan', ['slave trade']],
+  ['draft-coding', 'Propose a plan for learning C memory management without creating tasks.', 'draft_plan', ['memory']],
+  ['draft-math', 'What might a calculus review plan look like?', 'draft_plan', ['calculus']],
+  ['schedule-today', 'What work do I have scheduled today?', 'schedule_query', ['schedule']],
+  ['schedule-week', 'Summarize my study load this week.', 'schedule_query', ['week']],
+  ['schedule-next', 'Which unfinished task should I focus on next?', 'schedule_query', ['task']],
+  ['schedule-overload', 'Do I have any overloaded study days?', 'schedule_query', ['day']],
+  ['clarify-publish-os', 'Create and schedule an OS chapter review for me.', 'clarify', []],
+  ['clarify-publish-essay', 'Add an essay assignment and put its tasks on my calendar.', 'clarify', []],
+  ['clarify-ambiguous-ref', 'Reschedule that chapter assignment.', 'clarify', []],
+  ['clarify-vague-create', 'Make this into a scheduled assignment.', 'clarify', []],
+  ['repair-overload', 'Friday is too heavy; repair my current plan.', 'repair_plan', []],
+  ['repair-deadline', 'My deadline moved earlier. Replan my existing assignment.', 'repair_plan', []],
+  ['repair-missed', 'I missed two sessions. Adjust the rest of my published plan.', 'repair_plan', []],
+].map(([id, request, expectedIntent, expectedResponseTerms]) => ({
+  id: String(id), subject: 'conversation', horizonDays: 7, complexity: 'Medium', totalItems: 6,
+  request: String(request), expectedIntent: expectedIntent as EvaluationCase['expectedIntent'],
+  expectedResponseTerms: expectedResponseTerms as string[],
+}));
+
+evaluationDataset.push(...conversationalCases);

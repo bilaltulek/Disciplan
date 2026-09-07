@@ -4,7 +4,7 @@ import {
 import { z } from 'zod';
 import { PlanDraftSchema, type PlanDraft } from '../../shared/contracts.js';
 import type { AssistantResponse, DisciplanState, IntentEnvelope, ReviewResult } from './graph-state.js';
-import type { ModelGateway } from './model-gateway.js';
+import { normalizeGoogleModelError, type ModelGateway } from './model-gateway.js';
 import { defineGovernedTool, type Capability, type ToolAuditEvent, type ToolContext } from './tool-registry.js';
 
 const { PROMPTS } = require('./runtime-registry.js') as {
@@ -186,7 +186,7 @@ export const createReadTools = ({
     }));
   }
   if (capabilities.has('assignment:read')) {
-    const inputSchema = z.object({ assignmentId: z.number().int().positive().optional() });
+    const inputSchema = z.object({ assignmentId: z.number().int().min(1).optional() });
     const governed = defineGovernedTool({
       name: 'get_student_work_context', capability: 'assignment:read', inputSchema,
       outputSchema: z.object({ assignments: z.array(z.unknown()), tasks: z.array(z.unknown()) }),
@@ -241,31 +241,49 @@ const invokeStructured = async <Schema extends z.ZodObject>( {
     // structured response cannot consume the remaining run budget on a
     // redundant post-tool turn. Tool-using specialists retain createAgent.
     if (tools.length === 0) {
-      budget.modelCallsRemaining -= 1;
       const structuredModel = gateway.createChatModel().withStructuredOutput(schema, {
         name: `disciplan_${role}_response`,
         method: 'functionCalling',
         includeRaw: true,
       });
-      const result = await structuredModel.invoke(messages, { signal: controller.signal });
-      const metadata = ('usage_metadata' in result.raw && result.raw.usage_metadata
-        ? result.raw.usage_metadata
-        : undefined) as {
-          input_tokens?: number;
-          output_tokens?: number;
-          total_tokens?: number;
-        } | undefined;
-      await gateway.recordUsage?.({
-        role,
-        runId: state.runId,
-        actorUserId: state.actorUserId,
-        usage: {
-          inputTokens: Number(metadata?.input_tokens || 0),
-          outputTokens: Number(metadata?.output_tokens || 0),
-          totalTokens: Number(metadata?.total_tokens || 0),
-        },
-      });
-      return schema.parse(result.parsed);
+      for (let structureAttempt = 0; structureAttempt < 2; structureAttempt += 1) {
+        if (budget.modelCallsRemaining <= 0) {
+          throw Object.assign(new Error('The run model-call budget is exhausted.'), { code: 'MODEL_CALL_LIMIT' });
+        }
+        budget.modelCallsRemaining -= 1;
+        const attemptMessages = structureAttempt === 0
+          ? messages
+          : [...messages, {
+            role: 'user' as const,
+            content: 'Your previous response did not satisfy the required function schema. Return exactly one complete, valid structured response. Do not omit required fields.',
+          }];
+        try {
+          const result = await structuredModel.invoke(attemptMessages, { signal: controller.signal });
+          const metadata = ('usage_metadata' in result.raw && result.raw.usage_metadata
+            ? result.raw.usage_metadata
+            : undefined) as {
+              input_tokens?: number;
+              output_tokens?: number;
+              total_tokens?: number;
+            } | undefined;
+          await gateway.recordUsage?.({
+            role,
+            runId: state.runId,
+            actorUserId: state.actorUserId,
+            usage: {
+              inputTokens: Number(metadata?.input_tokens || 0),
+              outputTokens: Number(metadata?.output_tokens || 0),
+              totalTokens: Number(metadata?.total_tokens || 0),
+            },
+          });
+          return schema.parse(result.parsed);
+        } catch (error) {
+          const normalized = normalizeGoogleModelError(error);
+          if (structureAttempt === 0 && normalized.code === 'MODEL_STRUCTURE_INVALID') continue;
+          throw normalized;
+        }
+      }
+      throw Object.assign(new Error('The structured response repair was exhausted.'), { code: 'MODEL_STRUCTURE_INVALID' });
     }
 
     const agent = createAgent({
@@ -299,6 +317,8 @@ const invokeStructured = async <Schema extends z.ZodObject>( {
     budget.modelCallsRemaining = Math.max(0, budget.modelCallsRemaining - modelCalls);
     await gateway.recordUsage?.({ role, runId: state.runId, actorUserId: state.actorUserId, usage });
     return schema.parse(result.structuredResponse);
+  } catch (error) {
+    throw normalizeGoogleModelError(error);
   } finally {
     clearTimeout(timeout);
   }
@@ -312,7 +332,7 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
   const auditTool = options.auditTool ?? (() => undefined);
   const selectedGateway = (role: SpecialistRole) => options.gatewayForRole?.(role) ?? gateway;
   return ({
-  coordinate: (state: DisciplanState): Promise<IntentEnvelope> => invokeStructured({
+  coordinate: async (state: DisciplanState): Promise<IntentEnvelope> => normalizeAssistantDecision(state, await invokeStructured({
     gateway: selectedGateway('coordinator'),
     role: 'coordinator',
     schema: IntentEnvelopeSchema,
@@ -320,7 +340,7 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
     systemPrompt: PROMPTS.coordinator,
     budget,
     auditTool,
-  }),
+  })),
   createPlan: async (state: DisciplanState): Promise<PlanDraft> => normalizeModelPlanDraft(await invokeStructured({
     gateway: selectedGateway('planner'), role: 'planner', schema: ModelInitialPlanDraftSchema, state,
     systemPrompt: PROMPTS.planner, budget, auditTool,
@@ -343,6 +363,58 @@ export const createSpecialists = (gateway: ModelGateway, options: SpecialistOpti
     systemPrompt: PROMPTS.tutor, budget, auditTool,
   }).then((response) => ({ ...response, citations: [] })),
   });
+};
+
+export const normalizeAssistantDecision = (state: DisciplanState, decision: IntentEnvelope): IntentEnvelope => {
+  const message = state.latestUserMessage.trim();
+  const withIntent = (
+    intent: IntentEnvelope['intent'],
+    responseMode: IntentEnvelope['responseMode'],
+    overrides: Partial<IntentEnvelope> = {},
+  ): IntentEnvelope => ({ ...decision, intent, responseMode, ...overrides });
+
+  // A form-created assignment and a repair run are authenticated commands,
+  // not text that the model may reinterpret as a different product action.
+  if (state.assignment && state.runType === 'repair') {
+    return withIntent('repair_plan', 'plan', { assignmentId: state.assignment.id, missingFields: [] });
+  }
+  if (state.assignment && (state.runType === 'initial_plan' || state.triggerType === 'assignment_form')) {
+    return withIntent('publish_initial_plan', 'plan', { assignmentId: state.assignment.id, missingFields: [] });
+  }
+
+  if (/\b(scheduled today|study load (?:this|next) week|(?:which|what) unfinished task.*focus on next|overloaded study days?|what (?:work|tasks?).*scheduled|what should i (?:work|focus) on next)\b/i.test(message)) {
+    return withIntent('schedule_query', 'answer', { missingFields: [] });
+  }
+
+  if (/\b(break down|break this|subtasks?|divide .* into steps)\b/i.test(message)
+      && !/\b(create|publish|add .*assignment)\b/i.test(message)
+      && (!/\bschedule\b/i.test(message) || /\b(?:do not|don't|without)\s+(?:create|schedule)/i.test(message))) {
+    return withIntent('break_down_task', 'answer', { missingFields: [] });
+  }
+
+  const explicitlySchedules = /\b(create|add|make|publish|schedule)\b/i.test(message)
+    && /\b(schedule|scheduled|assignment|calendar|plan)\b/i.test(message);
+  const dateExpression = '(?:today|tomorrow|(?:next\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[\\/-]\\d{1,2}(?:[\\/-]\\d{2,4})?)';
+  const messageContainsDueDate = new RegExp(
+    `\\b(?:(?:due(?:\\s+date)?|deadline)\\s*(?::|is)?\\s*${dateExpression}|(?:by|before|on)\\s+${dateExpression})\\b`,
+    'i',
+  ).test(message);
+  const knownDueDate = state.assignment?.dueDate
+    || state.collectedContext.dueDate
+    || (messageContainsDueDate ? decision.normalizedAssignment?.dueDate || decision.contextDelta?.dueDate : undefined);
+  if (explicitlySchedules && !knownDueDate) {
+    return withIntent('clarify', 'question', {
+      missingFields: ['dueDate'],
+      clarificationQuestion: decision.clarificationQuestion
+        || 'I understand what you want to schedule. When should this work be completed?',
+    });
+  }
+
+  if (/\b(teach me|tutor me|quiz me|walk me through|one step at a time|ask me (?:a|one)|retrieval[ -]practice|review this .*tell me how|live .*exam|explain .*(?:introductory|beginner|advanced|college) level)\b/i.test(message)) {
+    return withIntent('tutor', 'answer', { missingFields: [] });
+  }
+
+  return decision;
 };
 
 const normalizeModelPlanDraft = (value: z.infer<typeof ModelInitialPlanDraftSchema> | z.infer<typeof ModelRepairPlanDraftSchema>): PlanDraft => PlanDraftSchema.parse({

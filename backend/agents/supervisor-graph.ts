@@ -32,6 +32,44 @@ const ensureActive = (state: DisciplanState) => {
   if (state.cancelled) throw Object.assign(new Error('Agent run was cancelled.'), { code: 'RUN_CANCELLED' });
 };
 
+export const wantsGroundedResources = (message: string) => (
+  /\b(links?|sources?|resources?|web search|search (?:the )?web|look (?:it )?up|online sources?|current external|latest (?:information|research))\b/i.test(message)
+);
+
+export const buildScheduleResponse = (state: DisciplanState): AssistantResponse => {
+  const pending = state.availableTasks.filter((task) => !task.completed);
+  const message = state.latestUserMessage;
+  let answer: string;
+  if (/\boverload/i.test(message)) {
+    const overloaded = Object.entries(state.existingLoad).filter(([date, minutes]) => {
+      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+      const weekdayLimit = state.planningProfile?.weekdayAvailableMinutes[weekday]
+        ?? state.planningProfile?.maxDailyMinutes ?? 0;
+      const limit = Math.min(state.planningProfile?.maxDailyMinutes ?? weekdayLimit, weekdayLimit);
+      return limit > 0 && minutes > limit;
+    });
+    answer = overloaded.length
+      ? `Your overloaded study days are ${overloaded.map(([date, minutes]) => `${date} (${minutes} minutes)`).join(', ')}.`
+      : 'You do not have any overloaded study days in the current schedule.';
+  } else if (/\btoday\b/i.test(message)) {
+    const today = pending.filter((task) => task.scheduledDate === state.planningDate);
+    answer = today.length
+      ? `Your schedule today includes: ${today.map((task) => task.description).join('; ')}.`
+      : 'Your schedule has no unfinished tasks for today.';
+  } else if (/\bnext\b/i.test(message)) {
+    const next = pending[0];
+    answer = next
+      ? `Your next unfinished task is “${next.description},” scheduled for ${next.scheduledDate}.`
+      : 'You do not have an unfinished task scheduled next.';
+  } else {
+    const upcoming = pending.slice(0, 7);
+    answer = upcoming.length
+      ? `This week’s study load includes: ${upcoming.map((task) => `${task.scheduledDate}: ${task.description}`).join('; ')}.`
+      : 'You do not have unfinished work scheduled this week.';
+  }
+  return { kind: 'answer', answer, studyTips: [], suggestedActions: [], citations: [] };
+};
+
 export const createSupervisorGraph = (
   dependencies: SupervisorDependencies,
   options: { checkpointer?: BaseCheckpointSaver | false } = {},
@@ -43,7 +81,11 @@ export const createSupervisorGraph = (
     })
     .addNode('coordinate', async (state) => {
       ensureActive(state);
-      const intent = await dependencies.coordinate(state);
+      const coordinated = await dependencies.coordinate(state);
+      const intent = {
+        ...coordinated,
+        useGroundedResources: Boolean(coordinated.useGroundedResources || wantsGroundedResources(state.latestUserMessage)),
+      };
       const sourceMessageIds = state.conversationMessages.filter((message) => message.role === 'user').map((message) => message.id);
       return {
         intent,
@@ -108,6 +150,10 @@ export const createSupervisorGraph = (
       const response = await dependencies.tutor(state);
       return { assistantResponse: response, finalResponse: response.answer, modelCallCount: state.modelCallCount + 1 };
     })
+    .addNode('schedule', (state) => {
+      const response = buildScheduleResponse(state);
+      return { assistantResponse: response, finalResponse: response.answer };
+    })
     .addNode('resources', async (state) => {
       ensureActive(state);
       const response = await dependencies.groundResources(state);
@@ -158,11 +204,13 @@ export const createSupervisorGraph = (
       if (!state.intent || state.intent.intent === 'clarify' || state.intent.missingFields.length) return 'clarify';
       if (state.intent.intent === 'publish_initial_plan') return state.assignment ? 'plan' : 'materializeAssignment';
       if (state.intent.intent === 'repair_plan') return 'repair';
+      if (state.intent.intent === 'schedule_query') return 'schedule';
       return 'tutor';
-    }, ['clarify', 'materializeAssignment', 'plan', 'repair', 'tutor'])
+    }, ['clarify', 'materializeAssignment', 'plan', 'repair', 'schedule', 'tutor'])
     .addEdge('clarify', 'context')
     .addEdge('materializeAssignment', 'plan')
     .addConditionalEdges('tutor', (state) => state.intent?.useGroundedResources ? 'resources' : 'respond', ['resources', 'respond'])
+    .addEdge('schedule', 'respond')
     .addEdge('resources', 'respond')
     .addEdge('plan', 'validate')
     .addEdge('repair', 'validate')

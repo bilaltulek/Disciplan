@@ -30,7 +30,7 @@ Disciplan is an agent-first assignment planning platform. A bounded LangGraph wo
 | Auth | JWT in HttpOnly cookies |
 | Agent runtime | LangGraph `StateGraph`, bounded LangChain specialists |
 | Durable execution | Trigger.dev Cloud |
-| AI | Gemini through `@langchain/google-genai` |
+| AI | Gemini through `@langchain/google` |
 
 ## ⚙️ Quick Start
 

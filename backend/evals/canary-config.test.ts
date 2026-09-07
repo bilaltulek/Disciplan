@@ -5,7 +5,7 @@ import { resolveCanarySelection } from './canary-config.js';
 describe('agent canary configuration', () => {
   it('treats only the complete unfiltered dataset as release evidence', () => {
     const complete = resolveCanarySelection(evaluationDataset, {});
-    expect(complete.cases).toHaveLength(68);
+    expect(complete.cases).toHaveLength(evaluationDataset.length);
     expect(complete.isCompleteReleaseRun).toBe(true);
 
     const limited = resolveCanarySelection(evaluationDataset, { AGENT_EVAL_LIMIT: '1' });

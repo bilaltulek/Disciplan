@@ -1,7 +1,7 @@
 import { Command, MemorySaver } from '@langchain/langgraph';
 import { describe, expect, it, vi } from 'vitest';
 import { createInitialGraphState } from './graph-state.js';
-import { createSupervisorGraph, type SupervisorDependencies } from './supervisor-graph.js';
+import { createSupervisorGraph, wantsGroundedResources, type SupervisorDependencies } from './supervisor-graph.js';
 
 const validDraft = {
   rationale: 'A bounded test plan.',
@@ -32,6 +32,11 @@ const dependencies = (): SupervisorDependencies => ({
 });
 
 describe('explicit Disciplan supervisor graph', () => {
+  it('requests grounding only for explicit external-resource language', () => {
+    expect(wantsGroundedResources('Find two trustworthy links and resources.')).toBe(true);
+    expect(wantsGroundedResources('What is on my current plan?')).toBe(false);
+  });
+
   it('persists typed state through validation, review, draft, and initial publication', async () => {
     const deps = dependencies();
     const graph = createSupervisorGraph(deps);
@@ -151,5 +156,29 @@ describe('explicit Disciplan supervisor graph', () => {
     expect(deps.materializeAssignment).not.toHaveBeenCalled();
     expect(result.finalResponse).toBe('Let us work through it.');
     expect(result.collectedContext.topic).toBe('C pointers');
+  });
+
+  it('answers schedule queries from owned context without a second model call', async () => {
+    const deps = dependencies();
+    vi.mocked(deps.coordinate).mockResolvedValue({
+      intent: 'schedule_query', assignmentId: null, missingFields: [], responseMode: 'answer',
+    });
+    vi.mocked(deps.loadContext).mockResolvedValue({
+      planningDate: '2026-09-06',
+      planningProfile: {
+        timezone: 'UTC', weekdayAvailableMinutes: { 0: 60 }, maxDailyMinutes: 60,
+        preferredSessionMinutes: 30, version: 1,
+      },
+      availableTasks: [{
+        id: 4, assignmentId: 1, description: 'Review pointers', scheduledDate: '2026-09-06', completed: false,
+      }],
+      existingLoad: { '2026-09-06': 30 },
+    });
+    const result = await createSupervisorGraph(deps).invoke(createInitialGraphState({
+      runId: '669652ae-051f-4c5b-a723-b67f3b3f8d55', actorUserId: 7,
+      runType: 'conversation', triggerType: 'user_message', userRequest: 'What work is scheduled today?',
+    }));
+    expect(result.finalResponse).toContain('Review pointers');
+    expect(deps.tutor).not.toHaveBeenCalled();
   });
 });

@@ -23,7 +23,7 @@ const logger = require('../infrastructure/logger.js');
 const TRANSIENT_RUN_FAILURE_CODES = new Set([
   '40001', '40P01', '53300', '57P01', '08000', '08003', '08006',
   'ECONNRESET', 'ETIMEDOUT', 'MODEL_TIMEOUT', 'MODEL_UNAVAILABLE', 'TRIGGER_DISPATCH_FAILED',
-  'AGENT_RUNTIME_FAILED',
+  'MODEL_QUOTA_EXCEEDED', 'AGENT_RUNTIME_FAILED',
 ]);
 
 export const classifyRunFailure = (error: unknown, attemptNumber: number) => {
@@ -55,6 +55,7 @@ type RunContextRow = {
   profile_version: number | null;
   published_plan_version_id: string | null;
   thread_summary: string | null;
+  summary_through_message_id: string | null;
   thread_context: Record<string, unknown> | null;
 };
 
@@ -74,6 +75,7 @@ const loadContext = async (runId: string): Promise<RunContextRow | null> => {
             m.content AS message_content,
             published.id AS published_plan_version_id,
             th.summary AS thread_summary,
+            th.summary_through_message_id,
             th.context_state AS thread_context
      FROM agent_runs r
      LEFT JOIN assignments a ON a.id = r.assignment_id AND a.user_id = r.user_id
@@ -100,6 +102,12 @@ const safeModelFailure = (error: unknown) => {
     return { code: 'MODEL_DRAFT_SCHEMA_INVALID', detail: `The model draft failed schema fields: ${fields.join(', ')}.` };
   }
   if (candidate?.code === 'MODEL_CALL_LIMIT') return { code: 'MODEL_DRAFT_CALL_LIMIT', detail: 'The model draft exceeded its bounded call limit.' };
+  if (candidate?.code === 'MODEL_SAFETY_BLOCK') return { code: 'MODEL_DRAFT_SAFETY_BLOCK', detail: 'The model draft was blocked by provider safety controls.' };
+  if (candidate?.code === 'MODEL_TIMEOUT') return { code: 'MODEL_DRAFT_TIMEOUT', detail: 'The model draft timed out safely.' };
+  if (candidate?.code === 'MODEL_QUOTA_EXCEEDED') return { code: 'MODEL_DRAFT_QUOTA_EXCEEDED', detail: 'The model draft could not run within provider quota.' };
+  if (candidate?.code === 'MODEL_NOT_FOUND' || candidate?.code === 'MODEL_AUTHENTICATION_FAILED' || candidate?.code === 'MODEL_REQUEST_INVALID') {
+    return { code: 'MODEL_DRAFT_CONFIGURATION_FAILED', detail: 'The model draft provider configuration was rejected.' };
+  }
   if (candidate?.code === 'MODEL_STRUCTURE_INVALID' || candidate?.name === 'StructuredOutputParsingError') {
     return { code: 'MODEL_DRAFT_STRUCTURE_INVALID', detail: 'The model draft did not return the required structured response.' };
   }
@@ -259,10 +267,16 @@ export async function executeGenericAgentRun(
     const [conversationResult, memoriesResult, assignmentsResult, tasksResult] = await Promise.all([
       context.thread_id
         ? db.query(
-          `SELECT id,role,content FROM agent_messages
+          `WITH boundary AS (
+             SELECT created_at,id FROM agent_messages
+             WHERE id=$3::uuid AND thread_id=$1 AND user_id=$2
+           )
+           SELECT id,role,content FROM agent_messages
            WHERE thread_id=$1 AND user_id=$2
+             AND ($3::uuid IS NULL OR NOT EXISTS (SELECT 1 FROM boundary)
+               OR (created_at,id) > (SELECT created_at,id FROM boundary))
            ORDER BY created_at DESC,id DESC LIMIT 60`,
-          [context.thread_id, context.user_id],
+          [context.thread_id, context.user_id, context.summary_through_message_id],
         )
         : Promise.resolve({ rows: [] }),
       db.query(
@@ -609,17 +623,21 @@ export async function executeGenericAgentRun(
         );
         await appendRunEvent(runId, status, status, waitingForApproval ? 'APPROVAL_REQUIRED' : 'CLARIFICATION_REQUIRED', safeDetail);
         if (context.thread_id) {
+          const assistantMessageId = crypto.randomUUID();
+          const assistantContent = waitingForApproval
+            ? safeDetail
+            : interrupts[0]?.value?.question || 'What detail would help me continue?';
           await db.query(
             `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
              VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
-            [crypto.randomUUID(), context.thread_id, context.user_id,
-              waitingForApproval ? safeDetail : interrupts[0]?.value?.question || 'What detail would help me continue?',
+            [assistantMessageId, context.thread_id, context.user_id, assistantContent,
               JSON.stringify({ kind: waitingForApproval ? 'proposal' : 'clarification', runId })],
           );
           await db.query(
-            `UPDATE agent_threads SET context_state=$2::jsonb,context_version=context_version+1,
-             last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$3`,
-            [context.thread_id, JSON.stringify({
+            `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,
+             summary_through_message_id=$3,context_state=$4::jsonb,context_version=context_version+1,
+             last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$5`,
+            [context.thread_id, `${conversationSummary}\nassistant: ${assistantContent}`.slice(-16_000), assistantMessageId, JSON.stringify({
               originalGoal: result.originalGoal,
               collectedContext: result.collectedContext,
               activeTutorTopic: result.activeTutorTopic,
@@ -645,12 +663,23 @@ export async function executeGenericAgentRun(
               : 'agentic',
         ],
       );
-      await appendRunEvent(runId, failed ? 'failed' : 'succeeded', failed ? 'validation' : 'completed', failed ? 'PLAN_FAILED' : 'PLAN_PUBLISHED', result.finalResponse || 'Agent run completed.');
+      const completionCode = failed
+        ? 'PLAN_FAILED'
+        : result.planVersionId
+          ? 'PLAN_PUBLISHED'
+          : result.assistantResponse?.kind === 'tutor'
+            ? 'TUTOR_RESPONSE_COMPLETED'
+            : 'ASSISTANT_RESPONSE_COMPLETED';
+      await appendRunEvent(
+        runId, failed ? 'failed' : 'succeeded', failed ? 'validation' : 'completed', completionCode,
+        failed ? 'The agent run could not produce a valid plan.' : 'The agent run completed safely.',
+      );
       if (context.thread_id && result.finalResponse) {
+        const assistantMessageId = crypto.randomUUID();
         await db.query(
           `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
            VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
-          [crypto.randomUUID(), context.thread_id, context.user_id, result.finalResponse, JSON.stringify({
+          [assistantMessageId, context.thread_id, context.user_id, result.finalResponse, JSON.stringify({
             kind: result.assistantResponse?.kind || (failed ? 'failure' : result.planVersionId ? 'plan' : 'answer'),
             runId,
             citations: result.assistantResponse?.citations || [],
@@ -659,11 +688,13 @@ export async function executeGenericAgentRun(
           })],
         );
         await db.query(
-          `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,context_state=$4::jsonb,
+          `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,
+           summary_through_message_id=$4,context_state=$5::jsonb,
            context_version=context_version+1,
            last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
            WHERE id=$1 AND user_id=$3`,
           [context.thread_id, `${conversationSummary}\nassistant: ${result.finalResponse}`.slice(-16_000), context.user_id,
+            assistantMessageId,
             JSON.stringify({ originalGoal: result.originalGoal, collectedContext: result.collectedContext, activeTutorTopic: result.activeTutorTopic })],
         );
       }
@@ -696,7 +727,24 @@ export async function executeGenericAgentRun(
       runId, terminal ? 'failed' : 'retrying', terminal ? 'failed' : 'retrying',
       code.slice(0, 100), terminal ? 'The agent run reached a safe terminal failure.' : 'A transient failure will be retried.',
     );
-    if (terminal) return { succeeded: false, failureCode: code };
+    if (terminal) {
+      await db.query(
+        `INSERT INTO agent_messages (id,thread_id,user_id,role,content,content_metadata)
+         SELECT $2,r.thread_id,r.user_id,'assistant',$3,$4::jsonb
+         FROM agent_runs r
+         WHERE r.id=$1 AND r.thread_id IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM agent_messages m
+             WHERE m.thread_id=r.thread_id AND m.user_id=r.user_id
+               AND m.role='assistant' AND m.content_metadata->>'runId'=$1
+               AND m.content_metadata->>'kind'='failure'
+           )`,
+        [runId, crypto.randomUUID(),
+          'I saved your message, but I could not generate a response right now. Please try this turn again.',
+          JSON.stringify({ kind: 'failure', runId, suggestedActions: [{ label: 'Try again', prompt: 'Please try my last request again.' }] })],
+      );
+      return { succeeded: false, failureCode: code };
+    }
     throw error;
   } finally {
     if (reservationActive) await budget.finalizeAgentRunBudget({ agentRunId: runId, status: 'released' });
