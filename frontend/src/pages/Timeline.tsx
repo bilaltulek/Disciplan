@@ -285,15 +285,20 @@ const Timeline = () => {
     <div className="timeline-warp-page">
       <DashboardNav />
       <main className="timeline-depth-stage">
-        <div className="absolute top-4 left-0 right-0 z-30 flex justify-center">
+        <header className="timeline-stage-heading">
+          <div>
+            <p className="app-eyebrow">Day by day</p>
+            <h1>Your Timeline</h1>
+          </div>
           <button
             type="button"
             onClick={() => setHideCompleted((prev) => !prev)}
-            className={`px-3 py-1.5 rounded-full text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${hideCompleted ? 'glass-chip text-foreground' : 'border-white/45 text-muted-foreground hover:text-foreground hover:bg-white/45'}`}
+            aria-pressed={hideCompleted}
+            className={`timeline-completed-filter ${hideCompleted ? 'is-active' : ''}`}
           >
             {hideCompleted ? 'Showing Incomplete Only' : 'Hide Completed'}
           </button>
-        </div>
+        </header>
 
         <button
           type="button"
@@ -338,15 +343,15 @@ const Timeline = () => {
                   key={layer.date}
                   className={`timeline-depth-layer ${isFront ? 'timeline-depth-front' : ''} ${delta > 0 ? 'timeline-depth-future' : ''} ${delta < 0 ? 'timeline-depth-past' : ''} ${isExiting ? 'timeline-depth-exiting' : ''} ${isEntering ? 'timeline-depth-entering' : ''} ${directionClass}`}
                   style={{
-                    '--depth-z': `${-230 * Math.abs(delta)}px`,
-                    '--depth-scale': Math.max(0.76, 1 - Math.abs(delta) * 0.1),
-                    '--depth-blur': `${Math.abs(delta) * 1.4}px`,
-                    '--depth-opacity': Math.max(0.22, 1 - Math.abs(delta) * 0.2),
-                    '--depth-y': `${delta < 0 ? Math.abs(delta) * 10 : 0}px`,
+                    '--depth-z': `${-96 * Math.abs(delta)}px`,
+                    '--depth-scale': Math.max(0.88, 1 - Math.abs(delta) * 0.055),
+                    '--depth-blur': '0px',
+                    '--depth-opacity': Math.max(0.36, 1 - Math.abs(delta) * 0.24),
+                    '--depth-y': `${delta < 0 ? Math.abs(delta) * 12 : Math.abs(delta) * 6}px`,
                     zIndex: 120 - Math.abs(delta),
                   } as CSSProperties}
                 >
-                  <article className="timeline-day-panel">
+                  <article className={`timeline-day-panel ${layer.isToday ? 'is-today' : ''}`}>
                     <header className="timeline-day-panel-header">
                       <h3>{layer.headerLabel}</h3>
                       <p>{layer.completedCount}/{layer.totalCount} completed</p>
@@ -384,7 +389,7 @@ const Timeline = () => {
                                   <button type="button" onClick={() => openEdit(task)} aria-label="Edit task">
                                     <Pencil className="w-4 h-4" />
                                   </button>
-                                  <button type="button" onClick={() => handleDelete(task.id)} disabled={deletingId === task.id} aria-label="Delete task">
+                                  <button className="timeline-task-delete" type="button" onClick={() => handleDelete(task.id)} disabled={deletingId === task.id} aria-label="Delete task">
                                     {deletingId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                   </button>
                                 </div>
@@ -409,7 +414,7 @@ const Timeline = () => {
       </main>
 
       <Dialog open={!!editTask} onOpenChange={(open) => !open && setEditTask(null)}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="timeline-edit-dialog">
           <DialogHeader>
             <DialogTitle>Edit Timeline Task</DialogTitle>
           </DialogHeader>

@@ -189,6 +189,58 @@ test('History filters, edits, and deletes completed work without changing its be
   await expect(page.getByText('No completed tasks match your filters.')).toBeVisible();
 });
 
+test('Timeline navigates days and preserves task edit, completion, deletion, and filtering flows', async ({ page }) => {
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrowDate = new Date(`${today}T12:00:00`);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = tomorrowDate.toISOString().split('T')[0];
+  let tasks = [
+    { id: 50, assignment_id: 14, task_description: 'Read process notes', assignment_title: 'Operating Systems lab', complexity: 'Hard', scheduled_date: today, estimated_minutes: 40, completed: false },
+    { id: 51, assignment_id: 14, task_description: 'Trace process calls', assignment_title: 'Operating Systems lab', complexity: 'Hard', scheduled_date: tomorrow, estimated_minutes: 45, completed: false },
+    { id: 52, assignment_id: 15, task_description: 'Review derivative rules', assignment_title: 'Calculus midterm', complexity: 'Medium', scheduled_date: tomorrow, estimated_minutes: 30, completed: false },
+  ];
+  await installAuthAndSettings(page, async (route, url) => {
+    const method = route.request().method();
+    if (url.pathname === '/api/timeline' && method === 'GET') return handled(route, tasks);
+    if (url.pathname === '/api/tasks/51' && method === 'PATCH') {
+      expect(route.request().postDataJSON()).toMatchObject({ task_description: 'Trace fork and exec calls', estimated_minutes: 50, completed: false });
+      tasks = tasks.map((task) => task.id === 51 ? { ...task, task_description: 'Trace fork and exec calls', estimated_minutes: 50 } : task);
+      return handled(route, { message: 'Task updated' });
+    }
+    if (url.pathname === '/api/tasks/51/toggle' && method === 'PATCH') {
+      expect(route.request().postDataJSON()).toEqual({ completed: true });
+      tasks = tasks.map((task) => task.id === 51 ? { ...task, completed: true } : task);
+      return handled(route, { message: 'Task updated' });
+    }
+    if (url.pathname === '/api/tasks/52' && method === 'DELETE') {
+      tasks = tasks.filter((task) => task.id !== 52);
+      return handled(route, { message: 'Task deleted' });
+    }
+    return undefined;
+  });
+  page.on('dialog', (dialog) => dialog.accept());
+
+  await page.goto('/timeline');
+  await expect(page.getByRole('heading', { name: /Today/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Next Day' }).click();
+  await expect(page.getByText('Trace process calls')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit task' }).first().click();
+  await page.getByLabel('Task Description').fill('Trace fork and exec calls');
+  await page.getByLabel('Minutes').fill('50');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(page.getByText('Trace fork and exec calls')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete task' }).last().click();
+  await expect(page.getByText('Review derivative rules')).toBeHidden();
+  await page.getByRole('checkbox', { name: 'Mark task complete' }).check();
+  await expect(page.getByRole('checkbox', { name: 'Mark task incomplete' })).toBeChecked();
+  const hideCompleted = page.getByRole('button', { name: 'Hide Completed' });
+  await hideCompleted.click();
+  await expect(page.getByRole('button', { name: 'Showing Incomplete Only' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Trace fork and exec calls')).toBeHidden();
+});
+
 test('Settings exposes planning controls and executes confirmed account deletion', async ({ page }) => {
   let deleted = false;
   await installAuthAndSettings(page, async (route, url) => {
