@@ -29,25 +29,28 @@ const safeUrl = (url: string) => {
 
 function AssistantMessage({ message, onAction }: { message: Message; onAction: (prompt: string) => void }) {
   const user = message.role === 'user';
-  return <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm ${user ? 'ml-auto bg-primary text-primary-foreground whitespace-pre-wrap' : 'bg-muted text-foreground'}`}>
-    {user ? message.content : <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrl} components={{
-      a: ({ children, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="underline text-primary">{children}</a>,
+  return <article className={`assistant-message ${user ? 'assistant-message-user' : 'assistant-message-response'}`}>
+    <p className="assistant-message-author">{user ? 'You' : 'Disciplan'}</p>
+    <div className={user ? 'whitespace-pre-wrap' : 'assistant-message-copy'}>
+      {user ? message.content : <ReactMarkdown remarkPlugins={[remarkGfm]} urlTransform={safeUrl} components={{
+      a: ({ children, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="assistant-inline-link">{children}</a>,
       ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
       ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
-      code: ({ children }) => <code className="rounded bg-background/70 px-1 py-0.5 font-mono text-xs">{children}</code>,
+      code: ({ children }) => <code className="assistant-inline-code">{children}</code>,
       p: ({ children }) => <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>,
-    }}>{message.content}</ReactMarkdown>}
-    {!user && message.content_metadata?.citations?.length ? <div className="mt-3 border-t pt-2">
-      <p className="text-xs font-semibold text-muted-foreground">Verified resources</p>
-      <ul className="mt-1 space-y-1">{message.content_metadata.citations.map((citation) => <li key={citation.url}>
-        <a href={safeUrl(citation.url)} target="_blank" rel="noopener noreferrer" className="text-primary underline">{citation.title}</a>
+      }}>{message.content}</ReactMarkdown>}
+    </div>
+    {!user && message.content_metadata?.citations?.length ? <div className="assistant-resources">
+      <p className="assistant-message-label">Verified resources</p>
+      <ul>{message.content_metadata.citations.map((citation) => <li key={citation.url}>
+        <a href={safeUrl(citation.url)} target="_blank" rel="noopener noreferrer" className="assistant-inline-link">{citation.title}</a>
       </li>)}</ul>
     </div> : null}
-    {!user && message.content_metadata?.suggestedActions?.length ? <div className="mt-3 flex flex-wrap gap-2">
+    {!user && message.content_metadata?.suggestedActions?.length ? <div className="assistant-suggested-actions">
       {message.content_metadata.suggestedActions.map((action) => <Button key={`${action.label}-${action.prompt}`} type="button" variant="outline" size="sm" onClick={() => onAction(action.prompt)}>{action.label}</Button>)}
     </div> : null}
-    {!user && message.content_metadata?.planSource === 'fallback' ? <p className="mt-2 text-xs text-amber-700">A deterministic fallback plan was used.</p> : null}
-  </div>;
+    {!user && message.content_metadata?.planSource === 'fallback' ? <p className="assistant-fallback-note">A deterministic fallback plan was used.</p> : null}
+  </article>;
 }
 
 export default function Assistant() {
@@ -176,38 +179,52 @@ export default function Assistant() {
 
   return <div className="page-shell min-h-screen">
     <DashboardNav />
-    <main className="container mx-auto p-4 md:p-8 grid md:grid-cols-[260px_1fr] gap-4 h-[calc(100vh-7rem)]">
-      <Card className="p-3 overflow-y-auto">
-        <Button className="w-full mb-3" variant="outline" disabled={!capabilities?.conversationalPlanning} onClick={() => void createThread()}>
+    <main className="app-container assistant-workspace">
+      <Card className="assistant-sidebar">
+        <div className="assistant-sidebar-heading">
+          <p className="app-eyebrow">Workspace</p>
+          <h2>Conversations</h2>
+        </div>
+        <Button className="assistant-new-thread" variant="outline" disabled={!capabilities?.conversationalPlanning} onClick={() => void createThread()}>
           <MessageSquarePlus className="w-4 h-4 mr-2" /> New conversation
         </Button>
-        <nav aria-label="Conversations" className="space-y-1">
+        <nav aria-label="Conversations" className="assistant-thread-list">
           {threads.map((thread) => <button key={thread.id} type="button" onClick={() => setActiveThreadId(thread.id)}
-            className={`w-full text-left rounded-lg px-3 py-2 text-sm ${thread.id === activeThreadId ? 'bg-primary/10 text-primary' : 'hover:bg-muted'}`}>
-            {thread.title || 'New conversation'}
+            aria-current={thread.id === activeThreadId ? 'page' : undefined}
+            className={thread.id === activeThreadId ? 'is-active' : undefined}>
+            <span>{thread.title || 'New conversation'}</span>
+            <time dateTime={thread.last_activity_at}>{new Date(thread.last_activity_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</time>
           </button>)}
+          {threads.length === 0 && <p className="assistant-no-threads">No conversations yet.</p>}
         </nav>
       </Card>
-      <Card className="flex min-h-0 flex-col overflow-hidden">
-        <header className="border-b p-4 flex items-center gap-2"><Bot className="w-5 h-5 text-primary" /><h1 className="font-semibold">Disciplan Assistant</h1></header>
-        <section aria-live="polite" className="flex-1 overflow-y-auto p-4 space-y-3">
-          {messages.length === 0 && <div className="text-center text-muted-foreground py-16"><p className="font-medium">What would you like to learn or plan?</p><p className="text-sm mt-1">Ask for an explanation, a guided study session, resources, a task breakdown, or a schedule.</p></div>}
+      <Card className="assistant-thread">
+        <header className="assistant-thread-header">
+          <span className="assistant-mark" aria-hidden="true"><Bot /></span>
+          <div><p className="app-eyebrow">Planning workspace</p><h1>Disciplan Assistant</h1></div>
+        </header>
+        <section aria-live="polite" className="assistant-transcript">
+          {messages.length === 0 && <div className="assistant-empty"><span className="assistant-mark" aria-hidden="true"><Bot /></span><p>What would you like to learn or plan?</p><span>Ask for an explanation, a guided study session, resources, a task breakdown, or a schedule.</span></div>}
           {messages.map((message) => <AssistantMessage key={message.id} message={message} onAction={setDraft} />)}
-          {approvals.map((approval) => <Card key={approval.id} className="p-4 border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
-            <h2 className="font-semibold">Review changes for {approval.assignment_title}</h2>
-            {approval.rationale && <p className="text-sm text-muted-foreground mt-1">{approval.rationale}</p>}
-            <ul className="mt-3 space-y-2 text-sm">{approval.items.map((item) => <li key={`${item.logical_task_id}-${item.operation}`} className="grid grid-cols-[72px_1fr_auto] gap-2"><span className="uppercase text-xs font-medium text-amber-700">{item.operation}</span><span>{item.task_description}</span><span className="text-muted-foreground">{item.scheduled_date}</span></li>)}</ul>
-            <div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => void decideApproval(approval, 'reject')}>Keep current plan</Button><Button onClick={() => void decideApproval(approval, 'approve')}>Approve changes</Button></div>
+          {approvals.map((approval) => <Card key={approval.id} className="assistant-approval">
+            <div className="assistant-approval-heading"><p className="assistant-message-label">Approval required</p><h2>Review changes for {approval.assignment_title}</h2></div>
+            {approval.rationale && <p className="assistant-approval-rationale">{approval.rationale}</p>}
+            <ul className="assistant-approval-items">{approval.items.map((item) => <li key={`${item.logical_task_id}-${item.operation}`}>
+              <span className={item.operation === 'remove' ? 'is-remove' : 'is-change'}>{item.operation}</span>
+              <span>{item.task_description}</span>
+              <span><time dateTime={item.scheduled_date}>{item.scheduled_date}</time> · {item.estimated_minutes} min</span>
+            </li>)}</ul>
+            <div className="assistant-approval-actions"><Button variant="outline" onClick={() => void decideApproval(approval, 'reject')}>Keep current plan</Button><Button onClick={() => void decideApproval(approval, 'approve')}>Approve changes</Button></div>
           </Card>)}
-          {activeRun && !TERMINAL.has(activeRun.status) && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> {activeRun.current_step || activeRun.status}</div>}
-          {activeRun?.status === 'waiting_for_input' && <p className="text-sm text-muted-foreground" role="status">Reply below when you are ready. I will keep the context we already discussed.</p>}
-          {activeRun?.status === 'failed' && <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><span>Your message is saved, but the response could not be completed.</span><Button type="button" size="sm" variant="outline" onClick={() => void retryRun()}>Retry</Button></div>}
-          {capabilities && !capabilities.conversationalPlanning && <p className="text-sm text-muted-foreground" role="status">Conversational planning is not enabled in this environment. You can still create a deterministic plan from the Dashboard.</p>}
-          {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+          {activeRun && !TERMINAL.has(activeRun.status) && <div className="assistant-run-status"><Loader2 className="animate-spin" /> {activeRun.current_step || activeRun.status}</div>}
+          {activeRun?.status === 'waiting_for_input' && <p className="assistant-status-note" role="status">Reply below when you are ready. I will keep the context we already discussed.</p>}
+          {activeRun?.status === 'failed' && <div className="assistant-status-note" role="status"><span>Your message is saved, but the response could not be completed.</span><Button type="button" size="sm" variant="outline" onClick={() => void retryRun()}>Retry</Button></div>}
+          {capabilities && !capabilities.conversationalPlanning && <p className="assistant-status-note" role="status">Conversational planning is not enabled in this environment. You can still create a deterministic plan from the Dashboard.</p>}
+          {error && <p className="assistant-error" role="alert">{error}</p>}
         </section>
-        <form className="border-t p-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-          <Textarea aria-label="Message Disciplan" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!capabilities?.conversationalPlanning} maxLength={4000} placeholder={capabilities?.conversationalPlanning ? 'Teach me pointers, quiz me on chapter 1, or help me plan…' : 'Conversational planning is unavailable'} className="min-h-12 max-h-32" />
-          <Button type="submit" size="icon" disabled={!draft.trim() || !capabilities?.conversationalPlanning} aria-label="Send message"><Send className="w-4 h-4" /></Button>
+        <form className="assistant-composer" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
+          <Textarea aria-label="Message Disciplan" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!capabilities?.conversationalPlanning} maxLength={4000} placeholder={capabilities?.conversationalPlanning ? 'Teach me pointers, quiz me on chapter 1, or help me plan…' : 'Conversational planning is unavailable'} />
+          <Button type="submit" size="icon" disabled={!draft.trim() || !capabilities?.conversationalPlanning} aria-label="Send message"><Send /></Button>
         </form>
       </Card>
     </main>
