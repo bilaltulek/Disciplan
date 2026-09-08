@@ -82,6 +82,26 @@ test('authenticated shell exposes responsive navigation and active-page context'
   }
 });
 
+test('authenticated product reflows at 200% text size and honors reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await installAuthAndSettings(page, async (route, url) => {
+    if (url.pathname === '/api/assignments' && route.request().method() === 'GET') return handled(route, []);
+    if (url.pathname === '/api/timeline' && route.request().method() === 'GET') return handled(route, []);
+    return undefined;
+  });
+
+  await page.goto('/dashboard');
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await expect(page.getByRole('heading', { name: 'Current Assignments' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByRole('link', { name: 'Timeline' }).click();
+  await expect(page.getByRole('heading', { name: /Today/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.locator('.timeline-depth-layer').first().evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+});
+
 test('Dashboard creates an assignment and preserves semantic filtering controls', async ({ page }) => {
   let created = false;
   await installAuthAndSettings(page, async (route, url) => {
@@ -241,16 +261,51 @@ test('Timeline navigates days and preserves task edit, completion, deletion, and
   await expect(page.getByText('Trace fork and exec calls')).toBeHidden();
 });
 
-test('Settings exposes planning controls and executes confirmed account deletion', async ({ page }) => {
+test('Profile keeps its existing update flow inside the redesigned account surface', async ({ page }) => {
+  let updated = false;
+  await installAuthAndSettings(page, async (route, url) => {
+    if (url.pathname === '/api/profile' && route.request().method() === 'PATCH') {
+      expect(route.request().postDataJSON()).toEqual({ name: 'Avery Chen' });
+      updated = true;
+      return handled(route, { user: { id: 7, email: 'student@example.invalid', name: 'Avery Chen' } });
+    }
+    return undefined;
+  });
+
+  await page.goto('/profile');
+  await page.getByLabel('Display Name').fill('Avery Chen');
+  await page.getByRole('button', { name: 'Save Profile' }).click();
+  await expect.poll(() => updated).toBe(true);
+  await expect(page.getByRole('status')).toHaveText('Profile updated.');
+});
+
+test('Settings saves planning controls, confirms memory, and executes account deletion', async ({ page }) => {
   let deleted = false;
+  let planningSaved = false;
+  let memoryPending = true;
   await installAuthAndSettings(page, async (route, url) => {
     const method = route.request().method();
-    if (url.pathname === '/api/planning-profile' && method === 'GET') return handled(route, { profile: {
+    const profile = {
       version: 2, timezone: 'America/Chicago',
       weekday_available_minutes: { 0: 0, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 0 },
       max_daily_minutes: 120, preferred_session_minutes: 45,
-    } });
-    if (url.pathname === '/api/preference-memories') return handled(route, { memories: [] });
+    };
+    if (url.pathname === '/api/planning-profile' && method === 'GET') return handled(route, { profile });
+    if (url.pathname === '/api/planning-profile' && method === 'PATCH') {
+      expect(route.request().postDataJSON()).toMatchObject({ max_daily_minutes: 150, expectedVersion: 2 });
+      planningSaved = true;
+      return handled(route, { profile: { ...profile, version: 3, max_daily_minutes: 150 } });
+    }
+    if (url.pathname === '/api/settings' && method === 'PATCH') {
+      return handled(route, { settings: route.request().postDataJSON() });
+    }
+    if (url.pathname === '/api/preference-memories' && method === 'GET') return handled(route, { memories: memoryPending ? [{
+      id: 'memory-1', memory_key: 'preferred_study_time', memory_value: 'Late afternoon', status: 'proposed',
+    }] : [] });
+    if (url.pathname === '/api/preference-memories/memory-1/confirm' && method === 'POST') {
+      memoryPending = false;
+      return handled(route, { memory: { id: 'memory-1', status: 'confirmed' } });
+    }
     if (url.pathname === '/api/account' && method === 'DELETE') {
       expect(route.request().postDataJSON()).toEqual({ password: 'student-password' });
       deleted = true;
@@ -264,6 +319,13 @@ test('Settings exposes planning controls and executes confirmed account deletion
 
   await page.goto('/settings');
   await expect(page.getByLabel('Timezone')).toHaveValue('America/Chicago');
+  await page.getByLabel('Maximum minutes per day').fill('150');
+  await page.getByRole('button', { name: 'Save Settings' }).click();
+  await expect.poll(() => planningSaved).toBe(true);
+  await expect(page.getByRole('status')).toHaveText('Settings saved.');
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect.poll(() => memoryPending).toBe(false);
+  await expect(page.getByText('No saved or proposed preferences.')).toBeVisible();
   await page.getByRole('button', { name: 'Delete Account' }).click();
   await expect.poll(() => deleted).toBe(true);
   await expect(page).toHaveURL(/\/$/);

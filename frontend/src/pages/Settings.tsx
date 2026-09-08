@@ -117,13 +117,13 @@ const Settings = () => {
   };
 
   return (
-    <div className="page-shell transition-colors duration-300">
+    <div className="page-shell">
       <DashboardNav />
-      <div className="container mx-auto p-6 md:p-10 max-w-2xl">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Settings</h1>
+      <main className="app-container app-page settings-page">
+        <header className="settings-heading"><p className="app-eyebrow">Preferences</p><h1 className="app-page-heading">Settings</h1><p>Set your planning capacity, defaults, and safety controls.</p></header>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="settings-section">
+          <CardHeader className="settings-section-header">
             <CardTitle className="flex items-center gap-2"><Eye className="w-5 h-5" /> Appearance</CardTitle>
             <CardDescription>Control how Disciplan looks for you.</CardDescription>
           </CardHeader>
@@ -134,7 +134,7 @@ const Settings = () => {
                 id="theme_mode"
                 value={draft.theme_mode}
                 onChange={(e) => setDraft((prev) => ({ ...prev, theme_mode: e.target.value as ThemeMode }))}
-                className="glass-input h-10 rounded-xl border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="app-select h-11 px-3 py-2 text-sm"
               >
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
@@ -144,8 +144,8 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="settings-section">
+          <CardHeader className="settings-section-header">
             <CardTitle className="flex items-center gap-2"><CalendarClock className="w-5 h-5" /> Planning capacity</CardTitle>
             <CardDescription>These explicit limits keep agent-created plans realistic.</CardDescription>
           </CardHeader>
@@ -158,14 +158,14 @@ const Settings = () => {
               <div className="grid gap-2"><Label htmlFor="max_daily_minutes">Maximum minutes per day</Label><Input id="max_daily_minutes" type="number" min={1} max={1440} value={profile.max_daily_minutes} onChange={(event) => setProfile((current) => ({ ...current, max_daily_minutes: Number(event.target.value) }))} /></div>
               <div className="grid gap-2"><Label htmlFor="preferred_session_minutes">Preferred session minutes</Label><Input id="preferred_session_minutes" type="number" min={5} max={480} value={profile.preferred_session_minutes} onChange={(event) => setProfile((current) => ({ ...current, preferred_session_minutes: Number(event.target.value) }))} /></div>
             </div>
-            <fieldset className="grid gap-3"><legend className="text-sm font-medium mb-1">Available minutes by weekday</legend>
-              {weekdayLabels.map((label, day) => <div key={label} className="grid grid-cols-[1fr_120px] items-center gap-3"><Label htmlFor={`weekday-${day}`}>{label}</Label><Input id={`weekday-${day}`} type="number" min={0} max={1440} value={profile.weekday_available_minutes[day]} onChange={(event) => setProfile((current) => ({ ...current, weekday_available_minutes: { ...current.weekday_available_minutes, [day]: Number(event.target.value) } }))} /></div>)}
+            <fieldset className="settings-weekdays"><legend>Available minutes by weekday</legend>
+              {weekdayLabels.map((label, day) => <div key={label}><Label htmlFor={`weekday-${day}`}>{label}</Label><Input id={`weekday-${day}`} type="number" min={0} max={1440} value={profile.weekday_available_minutes[day]} onChange={(event) => setProfile((current) => ({ ...current, weekday_available_minutes: { ...current.weekday_available_minutes, [day]: Number(event.target.value) } }))} /></div>)}
             </fieldset>
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="settings-section">
+          <CardHeader className="settings-section-header">
             <CardTitle className="flex items-center gap-2"><Gauge className="w-5 h-5" /> Productivity</CardTitle>
             <CardDescription>Set defaults that speed up assignment planning.</CardDescription>
           </CardHeader>
@@ -176,7 +176,7 @@ const Settings = () => {
                 id="start_page"
                 value={draft.start_page}
                 onChange={(e) => setDraft((prev) => ({ ...prev, start_page: e.target.value as StartPage }))}
-                className="glass-input h-10 rounded-xl border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="app-select h-11 px-3 py-2 text-sm"
               >
                 <option value="dashboard">Dashboard</option>
                 <option value="timeline">Timeline</option>
@@ -190,7 +190,7 @@ const Settings = () => {
                 id="assignment_default_complexity"
                 value={draft.assignment_default_complexity}
                 onChange={(e) => setDraft((prev) => ({ ...prev, assignment_default_complexity: e.target.value as Complexity }))}
-                className="glass-input h-10 rounded-xl border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="app-select h-11 px-3 py-2 text-sm"
               >
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
@@ -210,19 +210,18 @@ const Settings = () => {
                   ...prev,
                   assignment_default_items: Number.parseInt(e.target.value, 10) || 1,
                 }))}
-                className="glass-input"
               />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardHeader>
+        <Card className="settings-section">
+          <CardHeader className="settings-section-header">
             <CardTitle className="flex items-center gap-2"><Shield className="w-5 h-5" /> Safety</CardTitle>
             <CardDescription>Manage confirmation prompts for irreversible actions.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="settings-toggle-row">
               <div className="space-y-0.5">
                 <Label className="text-base">Confirm before deleting assignment</Label>
                 <p className="text-sm text-muted-foreground">Show a browser confirmation prompt before deleting.</p>
@@ -235,36 +234,36 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        <div className="mb-6 flex items-center justify-between">
-          <p className={`text-sm ${status.includes('Failed') ? 'text-red-500' : 'text-muted-foreground'}`}>{status}</p>
+        <div className="settings-save-row">
+          <p className={status.toLowerCase().includes('failed') ? 'settings-status is-error' : 'settings-status'} role="status">{status}</p>
           <Button onClick={handleSave} disabled={!hasChanges || saving}>
             {saving ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader><CardTitle className="flex items-center gap-2"><Brain className="w-5 h-5" /> Agent memory</CardTitle><CardDescription>Only preferences you confirm are used across conversations.</CardDescription></CardHeader>
-          <CardContent className="space-y-3">
-            {memories.length === 0 && <p className="text-sm text-muted-foreground">No saved or proposed preferences.</p>}
-            {memories.map((memory) => <div key={memory.id} className="rounded-xl border p-3 flex items-start justify-between gap-3"><div><p className="text-xs uppercase text-muted-foreground">{memory.memory_key.replaceAll('_', ' ')} · {memory.status}</p><p className="text-sm mt-1">{String(memory.memory_value)}</p></div><div className="flex gap-2">{memory.status === 'proposed' && <Button size="sm" onClick={() => void handleMemory(memory, 'confirm')}>Confirm</Button>}<Button size="sm" variant="outline" onClick={() => void handleMemory(memory, 'delete')}>Delete</Button></div></div>)}
+        <Card className="settings-section">
+          <CardHeader className="settings-section-header"><CardTitle className="flex items-center gap-2"><Brain className="w-5 h-5" /> Agent memory</CardTitle><CardDescription>Only preferences you confirm are used across conversations.</CardDescription></CardHeader>
+          <CardContent className="settings-memories">
+            {memories.length === 0 && <p className="settings-empty">No saved or proposed preferences.</p>}
+            {memories.map((memory) => <div key={memory.id} className={`settings-memory ${memory.status === 'proposed' ? 'is-proposed' : ''}`}><div><p>{memory.memory_key.replaceAll('_', ' ')} · {memory.status}</p><span>{String(memory.memory_value)}</span></div><div>{memory.status === 'proposed' && <Button size="sm" onClick={() => void handleMemory(memory, 'confirm')}>Confirm</Button>}<Button size="sm" variant="outline" onClick={() => void handleMemory(memory, 'delete')}>Delete</Button></div></div>)}
           </CardContent>
         </Card>
 
-        <Card className="border-red-200/70">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600"><Lock className="w-5 h-5" /> Danger Zone</CardTitle>
+        <Card className="settings-section settings-danger">
+          <CardHeader className="settings-section-header">
+            <CardTitle className="flex items-center gap-2"><Lock className="w-5 h-5" /> Danger Zone</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
+            <div className="settings-danger-row">
               <div className="space-y-0.5">
-                <Label className="text-base text-red-600">Delete Account</Label>
+                <Label className="text-base">Delete Account</Label>
                 <p className="text-sm text-muted-foreground">Permanently remove your account and all data.</p>
               </div>
               <Button variant="destructive" onClick={() => void handleDeleteAccount()}>Delete Account</Button>
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   );
 };
