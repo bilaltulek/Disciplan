@@ -126,21 +126,6 @@
   .dark .timeline-task-row {
     @apply border-slate-700/80 bg-slate-800/70;
   }
-  .landing-nav {
-    @apply sticky top-0 z-50 transition-all duration-200;
-  }
-  .landing-nav-scrolled {
-    @apply bg-white/70 backdrop-blur-md border-b border-white/50 shadow-[0_10px_30px_-22px_rgba(16,30,59,0.6)];
-  }
-  .landing-nav-link {
-    @apply text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md px-1;
-  }
-  .landing-nav-link-btn {
-    @apply text-primary hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-primary/60;
-  }
-  .landing-section {
-    @apply container mx-auto px-4 md:px-6 py-16 md:py-24;
-  }
   .task-hue-easy {
     @apply border-emerald-300/60 bg-gradient-to-br from-emerald-300/40 via-emerald-100/25 to-emerald-200/20;
   }

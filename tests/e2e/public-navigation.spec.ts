@@ -39,3 +39,36 @@ test('mobile landing uses purpose-made product crops and has no horizontal overf
   await expect(skip).toBeFocused();
   expect(await skip.evaluate((element) => getComputedStyle(element).outlineWidth)).not.toBe('0px');
 });
+
+test('landing reflows at 200% text size and honors reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { font-size: 200% !important; }' });
+
+  const diagnostics = await page.evaluate(() => {
+    const button = document.querySelector<HTMLElement>('.product-button');
+    const transitionDuration = button ? getComputedStyle(button).transitionDuration : '';
+    const durationMs = transitionDuration.split(',').map((duration) => {
+      const value = Number.parseFloat(duration);
+      return duration.trim().endsWith('ms') ? value : value * 1000;
+    });
+
+    return {
+      hasOverflow: document.documentElement.scrollWidth > window.innerWidth,
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      maximumTransitionMs: Math.max(0, ...durationMs),
+    };
+  });
+
+  expect(diagnostics).toEqual({
+    hasOverflow: false,
+    reducedMotion: true,
+    maximumTransitionMs: 0.01,
+  });
+
+  for (const selector of ['.product-theme-toggle', '.product-nav-login', '.product-button-small']) {
+    const height = await page.locator(selector).evaluate((element) => element.getBoundingClientRect().height);
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
+});
