@@ -25,6 +25,13 @@ type SortOption = 'dueSoonest' | 'newest' | 'mostProgress';
 interface AssignmentForm { title: string; description: string; complexity: Complexity; dueDate: string; totalItems: number | string; }
 interface CreateAssignmentResponse { queued: boolean; assignment: AssignmentSummary; run: { id: string }; }
 
+const filterClassByLevel: Record<DifficultyFilter, string> = {
+  All: 'dashboard-filter-all',
+  Easy: 'dashboard-filter-easy',
+  Medium: 'dashboard-filter-medium',
+  Hard: 'dashboard-filter-hard',
+};
+
 const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
 export default function Dashboard() {
@@ -93,12 +100,89 @@ export default function Dashboard() {
     catch (error) { alert(errorMessage(error, `Failed to ${action} plan generation.`)); }
   };
 
-  return <div className="page-shell"><DashboardNav /><main className="container mx-auto p-6 md:p-10">
-    <h2 className="text-2xl font-bold text-foreground mb-6">Current Assignments</h2>
-    {planWarning && <div className="mb-5 glass-chip rounded-xl p-3 flex items-center justify-between gap-3 border-amber-300/70 bg-amber-50/60"><p className="text-sm text-amber-800">{planWarning}</p><button type="button" onClick={() => setPlanWarning('')} className="text-xs text-amber-700 hover:text-amber-900 underline shrink-0">Dismiss</button></div>}
-    {pendingDeletions.length > 0 && <div className="mb-5 space-y-2">{pendingDeletions.map(({ task }) => <div key={task.id} className="glass-chip rounded-xl p-3 flex items-center justify-between gap-3"><p className="text-sm text-slate-700"><span className="font-semibold">{task.title}</span> will be deleted in 5 seconds.</p><Button type="button" variant="outline" className="focus-visible:ring-2 focus-visible:ring-primary/60" onClick={() => handleUndoDeletion(task.id)}><Undo2 className="w-4 h-4 mr-2" />Undo</Button></div>)}</div>}
-    <div className="glass-panel rounded-2xl p-3 mb-6 flex flex-wrap items-center gap-3"><div className="flex items-center gap-2 text-sm text-muted-foreground pr-2"><Filter className="w-4 h-4" />Filter</div>{(['All', 'Easy', 'Medium', 'Hard'] as DifficultyFilter[]).map((level) => <button key={level} type="button" onClick={() => setDifficultyFilter(level)} className={`px-3 py-1.5 rounded-full text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${difficultyFilter === level ? 'glass-chip text-foreground' : 'border-white/45 text-muted-foreground hover:text-foreground hover:bg-white/45'}`}>{level}</button>)}<div className="ml-auto flex items-center gap-2"><ArrowUpDown className="w-4 h-4 text-muted-foreground" /><select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className="glass-input h-9 rounded-xl px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60" aria-label="Sort assignments"><option value="dueSoonest">Due Soonest</option><option value="newest">Newest</option><option value="mostProgress">Most Progress</option></select></div></div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"><Dialog open={isOpen} onOpenChange={setIsOpen}><DialogTrigger asChild><Card className="h-64 border-dashed border-2 border-white/60 bg-transparent hover:bg-white/35 cursor-pointer flex flex-col items-center justify-center group transition-colors"><div className="w-16 h-16 glass-chip rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><Plus className="w-8 h-8 text-primary" /></div><span className="font-semibold text-muted-foreground group-hover:text-primary">Add New Assignment</span></Card></DialogTrigger><DialogContent className="sm:max-w-[500px]"><DialogHeader><DialogTitle>Create New Study Plan</DialogTitle></DialogHeader><div className="grid gap-4 py-4"><div className="flex flex-col gap-1.5"><Label htmlFor="title">Title</Label><Input id="title" value={formData.title} onChange={(event) => setFormData({ ...formData, title: event.target.value })} placeholder="Calculus Midterm" /></div><div className="flex flex-col gap-1.5"><Label htmlFor="date">Due Date</Label><Input id="date" type="date" value={formData.dueDate} onChange={(event) => setFormData({ ...formData, dueDate: event.target.value })} /></div><div className="flex flex-col gap-1.5"><Label htmlFor="items">Workload</Label><Input id="items" type="number" value={formData.totalItems} onChange={(event) => setFormData({ ...formData, totalItems: event.target.value })} placeholder="Num items" /></div><div className="flex flex-col gap-1.5"><Label htmlFor="complexity">Difficulty</Label><select className="glass-input flex h-10 w-full rounded-xl border px-3 py-2 text-sm" value={formData.complexity} onChange={(event) => setFormData({ ...formData, complexity: event.target.value as Complexity })}><option value="Easy">Easy (Review)</option><option value="Medium">Medium (Standard)</option><option value="Hard">Hard (Exam Prep)</option></select></div><div className="flex flex-col gap-1.5"><Label htmlFor="desc">Description</Label><Textarea id="desc" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} placeholder="Describe the assignment..." /></div></div><DialogFooter><Button type="button" onClick={() => void handleAddTask()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{loading ? 'Queuing...' : 'Create Plan'}</Button></DialogFooter></DialogContent></Dialog>{visibleTasks.map((task) => <TaskCard key={task.id} task={task} onDeleteAssignment={handleDeleteAssignment} onRetryRun={(runId) => void handleRunAction(runId, 'retry')} onCancelRun={(runId) => void handleRunAction(runId, 'cancel')} />)}</div>
-    {visibleTasks.length === 0 && <Card className="mt-6 p-8 text-center glass-panel"><h3 className="text-lg font-semibold text-foreground mb-1">No assignments match this view</h3><p className="text-sm text-muted-foreground">Try switching filters or sorting, or create a new assignment.</p></Card>}
-  </main></div>;
+  return (
+    <div className="page-shell">
+      <DashboardNav />
+      <main className="app-container app-page">
+        <header className="mb-7">
+          <h1 className="app-page-heading">Current Assignments</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Create plans, monitor progress, and continue the next useful step.</p>
+        </header>
+
+        {planWarning && (
+          <div className="app-notice app-notice-warning">
+            <p className="text-sm">{planWarning}</p>
+            <button type="button" onClick={() => setPlanWarning('')} className="min-h-10 shrink-0 text-xs font-medium underline underline-offset-4">Dismiss</button>
+          </div>
+        )}
+
+        {pendingDeletions.length > 0 && (
+          <div className="mb-5 space-y-2">
+            {pendingDeletions.map(({ task }) => (
+              <div key={task.id} className="app-notice">
+                <p className="text-sm"><span className="font-semibold">{task.title}</span> will be deleted in 5 seconds.</p>
+                <Button type="button" variant="outline" onClick={() => handleUndoDeletion(task.id)}><Undo2 className="mr-2 h-4 w-4" />Undo</Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="dashboard-toolbar app-card">
+          <div className="dashboard-toolbar-label"><Filter className="h-4 w-4" />Filter</div>
+          {(['All', 'Easy', 'Medium', 'Hard'] as DifficultyFilter[]).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setDifficultyFilter(level)}
+              className={`dashboard-filter ${filterClassByLevel[level]}${difficultyFilter === level ? ' is-active' : ''}`}
+              aria-pressed={difficultyFilter === level}
+            >
+              {level}
+            </button>
+          ))}
+          <div className="dashboard-sort">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value as SortOption)} className="app-select h-10 px-3 text-sm" aria-label="Sort assignments">
+              <option value="dueSoonest">Due Soonest</option>
+              <option value="newest">Newest</option>
+              <option value="mostProgress">Most Progress</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+              <button type="button" className="dashboard-add-card">
+                <span className="dashboard-add-icon" aria-hidden="true"><Plus className="h-5 w-5" /></span>
+                <span className="font-semibold">Add New Assignment</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent className="assignment-dialog sm:max-w-[500px]">
+              <DialogHeader><DialogTitle>Create New Study Plan</DialogTitle></DialogHeader>
+              <div className="grid gap-4 py-3">
+                <div className="flex flex-col gap-1.5"><Label htmlFor="title">Title</Label><Input id="title" value={formData.title} onChange={(event) => setFormData({ ...formData, title: event.target.value })} placeholder="Calculus Midterm" /></div>
+                <div className="flex flex-col gap-1.5"><Label htmlFor="date">Due Date</Label><Input id="date" type="date" value={formData.dueDate} onChange={(event) => setFormData({ ...formData, dueDate: event.target.value })} /></div>
+                <div className="flex flex-col gap-1.5"><Label htmlFor="items">Workload</Label><Input id="items" type="number" value={formData.totalItems} onChange={(event) => setFormData({ ...formData, totalItems: event.target.value })} placeholder="Num items" /></div>
+                <div className="flex flex-col gap-1.5"><Label htmlFor="complexity">Difficulty</Label><select id="complexity" className="app-select flex h-10 w-full px-3 py-2 text-sm" value={formData.complexity} onChange={(event) => setFormData({ ...formData, complexity: event.target.value as Complexity })}><option value="Easy">Easy (Review)</option><option value="Medium">Medium (Standard)</option><option value="Hard">Hard (Exam Prep)</option></select></div>
+                <div className="flex flex-col gap-1.5"><Label htmlFor="desc">Description</Label><Textarea id="desc" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} placeholder="Describe the assignment..." /></div>
+              </div>
+              <DialogFooter><Button type="button" onClick={() => void handleAddTask()} disabled={loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{loading ? 'Queuing...' : 'Create Plan'}</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {visibleTasks.map((task) => (
+            <TaskCard key={task.id} task={task} onDeleteAssignment={handleDeleteAssignment} onRetryRun={(runId) => void handleRunAction(runId, 'retry')} onCancelRun={(runId) => void handleRunAction(runId, 'cancel')} />
+          ))}
+        </div>
+
+        {visibleTasks.length === 0 && (
+          <Card className="mt-6 p-8 text-center">
+            <h2 className="mb-1 text-lg font-semibold">No assignments match this view</h2>
+            <p className="text-sm text-muted-foreground">Try switching filters or sorting, or create a new assignment.</p>
+          </Card>
+        )}
+      </main>
+    </div>
+  );
 }

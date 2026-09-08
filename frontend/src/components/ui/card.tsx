@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 type DivProps = React.HTMLAttributes<HTMLDivElement>;
 
-const Card = React.forwardRef<HTMLDivElement, DivProps>(({ className, ...props }, ref) => <div ref={ref} className={cn('glass-panel rounded-3xl text-card-foreground', className)} {...props} />);
+const Card = React.forwardRef<HTMLDivElement, DivProps>(({ className, ...props }, ref) => <div ref={ref} className={cn('app-card glass-panel rounded-3xl text-card-foreground', className)} {...props} />);
 Card.displayName = 'Card';
 const CardHeader = React.forwardRef<HTMLDivElement, DivProps>(({ className, ...props }, ref) => <div ref={ref} className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />);
 CardHeader.displayName = 'CardHeader';

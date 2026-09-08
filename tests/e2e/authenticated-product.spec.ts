@@ -82,6 +82,61 @@ test('authenticated shell exposes responsive navigation and active-page context'
   }
 });
 
+test('Dashboard creates an assignment and preserves semantic filtering controls', async ({ page }) => {
+  let created = false;
+  await installAuthAndSettings(page, async (route, url) => {
+    const method = route.request().method();
+    if (url.pathname === '/api/assignments' && method === 'GET') {
+      return handled(route, created ? [{
+        id: 14,
+        title: 'Operating Systems lab',
+        description: 'Implement process control exercises.',
+        complexity: 'Hard',
+        due_date: '2099-09-30',
+        total_items: 6,
+        total_subtasks: 0,
+        completed_subtasks: 0,
+        plan_generation_status: 'queued',
+      }] : []);
+    }
+    if (url.pathname === '/api/assignments' && method === 'POST') {
+      expect(route.request().headers()['idempotency-key']).toBeTruthy();
+      expect(route.request().postDataJSON()).toEqual({
+        title: 'Operating Systems lab',
+        description: 'Implement process control exercises.',
+        complexity: 'Hard',
+        dueDate: '2099-09-30',
+        totalItems: 6,
+      });
+      created = true;
+      return handled(route, {
+        queued: true,
+        assignment: { id: 14 },
+        run: { id: 'run-14' },
+      }, 202);
+    }
+    return undefined;
+  });
+
+  await page.goto('/dashboard');
+  const addAssignment = page.getByRole('button', { name: 'Add New Assignment' });
+  expect(await addAssignment.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  await addAssignment.click();
+  await page.getByLabel('Title').fill('Operating Systems lab');
+  await page.getByLabel('Due Date').fill('2099-09-30');
+  await page.getByLabel('Workload').fill('6');
+  await page.getByLabel('Difficulty').selectOption('Hard');
+  await page.getByLabel('Description').fill('Implement process control exercises.');
+  await page.getByRole('button', { name: 'Create Plan' }).click();
+
+  await expect.poll(() => created).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Operating Systems lab' })).toBeVisible();
+  const hardFilter = page.getByRole('button', { name: 'Hard', exact: true });
+  await hardFilter.click();
+  await expect(hardFilter).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.difficulty-hard')).toHaveText('Hard');
+});
+
 test('Settings exposes planning controls and executes confirmed account deletion', async ({ page }) => {
   let deleted = false;
   await installAuthAndSettings(page, async (route, url) => {
