@@ -28,6 +28,59 @@ test('landing paints its stored neutral theme before the React bundle runs', asy
   });
 });
 
+for (const publicPath of ['/login', '/signup', '/terms', '/privacy']) {
+  test(`${publicPath} paints its stored neutral theme before React`, async ({ page }) => {
+    await page.addInitScript(() => window.localStorage.setItem('disciplan-landing-theme', 'dark'));
+    await page.route('**/src/main.jsx', (route) => route.abort());
+    await page.goto(publicPath);
+
+    expect(await page.evaluate(() => ({
+      theme: document.documentElement.dataset.landingTheme,
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      bodyImage: getComputedStyle(document.body).backgroundImage,
+    }))).toEqual({
+      theme: 'dark',
+      html: 'rgb(17, 18, 17)',
+      bodyImage: 'none',
+    });
+  });
+}
+
+test('credential auth pages preserve routes, labels, focus order, and legal links', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
+  await expect(page.getByLabel('Email')).toHaveAttribute('autocomplete', 'email');
+  await expect(page.getByLabel('Password')).toHaveAttribute('autocomplete', 'current-password');
+  await expect(page.getByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/signup');
+  await expect(page.getByText(/forgot password/i)).toHaveCount(0);
+
+  await page.goto('/signup');
+  await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');
+  await expect(page.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
+  await expect(page.getByText(/at least 13/i)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('auth pages remain usable at mobile width and 200% text size', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/signup');
+  await page.addStyleTag({ content: ':root { font-size: 200% !important; }' });
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  expect(await page.getByRole('button', { name: 'Create account' }).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  expect(await page.getByRole('link', { name: 'Log in' }).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+  const maximumTransitionMs = await page.getByRole('button', { name: 'Create account' }).evaluate((element) => (
+    Math.max(...getComputedStyle(element).transitionDuration.split(',').map((duration) => {
+      const value = Number.parseFloat(duration);
+      return duration.trim().endsWith('ms') ? value : value * 1000;
+    }))
+  ));
+  expect(maximumTransitionMs).toBeLessThanOrEqual(.01);
+});
+
 test('product-first landing presents real application sections and local theme control', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('disciplan-landing-theme', 'light'));
   await page.goto('/');

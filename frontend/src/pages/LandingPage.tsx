@@ -220,7 +220,12 @@ const LandingPage = () => {
             <a href="#assistant">Assistant</a>
             <a href="#history">History</a>
           </nav>
-          <div className="product-footer-account"><Link to="/login">Log in</Link><Link to="/signup">Create account</Link></div>
+          <div className="product-footer-account">
+            <Link to="/login">Log in</Link>
+            <Link to="/signup">Create account</Link>
+            <Link to="/terms">Terms</Link>
+            <Link to="/privacy">Privacy</Link>
+          </div>
         </div>
       </footer>
     </div>

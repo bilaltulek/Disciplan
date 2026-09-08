@@ -45,6 +45,8 @@ describe('product-first landing page', () => {
 
     expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute('href', '/signup');
     expect(screen.getAllByRole('link', { name: /log in/i })[0]).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/privacy');
     expect(container.querySelector('.product-actions a[href="/login"]')).toHaveClass('product-link');
     expect(container.querySelector('.product-actions a[href="/login"]')).not.toHaveClass('product-button');
     expect(container.querySelector('.product-nav-login')).toHaveClass('product-button-secondary');

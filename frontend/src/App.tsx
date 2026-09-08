@@ -10,6 +10,7 @@ import SignupPage from './pages/SignupPage';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Assistant from './pages/Assistant';
+import LegalPage from './pages/LegalPage';
 import { DEFAULT_SETTINGS } from './shared/settings/defaults';
 import { useLayoutEffect, type ReactNode } from 'react';
 
@@ -38,6 +39,8 @@ const AppRoutes = () => (
     <Route path="/" element={<LandingPage />} />
     <Route path="/login" element={<LoginPage />} />
     <Route path="/signup" element={<SignupPage />} />
+    <Route path="/terms" element={<LegalPage document="terms" />} />
+    <Route path="/privacy" element={<LegalPage document="privacy" />} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/assistant" element={<ProtectedRoute><Assistant /></ProtectedRoute>} />
     <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />

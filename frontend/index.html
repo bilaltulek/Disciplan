@@ -7,7 +7,8 @@
     <title>Disciplan</title>
     <script>
       (() => {
-        if (window.location.pathname !== '/') return;
+        const publicNeutralPaths = new Set(['/', '/login', '/signup', '/terms', '/privacy']);
+        if (!publicNeutralPaths.has(window.location.pathname)) return;
         let storedTheme;
         try {
           storedTheme = window.localStorage.getItem('disciplan-landing-theme');

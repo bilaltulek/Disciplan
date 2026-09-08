@@ -557,7 +557,7 @@
   .product-footer { margin-top: 76px; }
   .product-footer-inner { grid-template-columns: 1fr auto; min-height: 100px; }
   .product-footer nav { display: none; }
-  .product-footer-account { gap: 14px; }
+  .product-footer-account { flex-wrap: wrap; justify-content: flex-end; gap: 8px 14px; }
   .product-footer-account a:first-child { display: none; }
 }
 
