@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, CheckCircle2, Clock, Flame, Loader2, Pencil, Trash2, Trophy } from 'lucide-react';
+import { Calendar, CheckCircle2, Clock, Loader2, Pencil, Search, Trash2 } from 'lucide-react';
 import DashboardNav from '@/components/layout/DashboardNav';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,17 @@ const emptyForm: EditForm = {
   task_description: '', scheduled_date: '', estimated_minutes: '', actual_minutes: '',
 };
 const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+const filterClassByLevel: Record<ComplexityFilter, string> = {
+  All: 'history-filter',
+  Easy: 'history-filter history-filter-easy',
+  Medium: 'history-filter history-filter-medium',
+  Hard: 'history-filter history-filter-hard',
+};
+const difficultyClassByLevel: Record<Complexity, string> = {
+  Easy: 'difficulty-chip difficulty-easy',
+  Medium: 'difficulty-chip difficulty-medium',
+  Hard: 'difficulty-chip difficulty-hard',
+};
 
 export default function History() {
   const [history, setHistory] = useState<ScheduledTask[]>([]);
@@ -109,52 +120,58 @@ export default function History() {
   return (
     <div className="page-shell">
       <DashboardNav />
-      <div className="container mx-auto p-6 md:p-10">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-3 glass-chip rounded-full text-yellow-600"><Trophy className="w-6 h-6" /></div>
-          <div><h1 className="text-3xl font-bold text-foreground">Completion History</h1><p className="text-muted-foreground">Track your academic momentum</p></div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <StatCard label="Tasks Completed" value={String(stats.totalTasks)} />
-          <StatCard label="Study Time" value={`${Math.round(stats.totalMinutes / 60)} hours`} />
-          <StatCard label="Completed (Last 7 Days)" value={String(stats.weeklyTasks)} icon={<Flame className="w-7 h-7" />} />
-        </div>
-        <Card className="shadow-sm">
-          <CardHeader><CardTitle>Recent Activity</CardTitle></CardHeader>
-          <CardContent>
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="max-w-sm glass-input" placeholder="Search task or assignment" aria-label="Search completed tasks" />
-              {(['All', 'Easy', 'Medium', 'Hard'] as ComplexityFilter[]).map((level) => (
-                <button key={level} type="button" onClick={() => setComplexityFilter(level)} className={`px-3 py-1.5 rounded-full text-sm border ${complexityFilter === level ? 'glass-chip text-foreground' : 'text-muted-foreground'}`}>{level}</button>
-              ))}
-            </div>
-            {filteredHistory.length === 0 ? <div className="text-center py-10 text-muted-foreground">No completed tasks match your filters.</div> : (
-              <div className="space-y-4">{filteredHistory.map((task) => (
-                <div key={task.id} className="flex flex-wrap items-center justify-between gap-3 p-4 glass-chip rounded-xl">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-emerald-100/70 p-2 rounded-full"><CheckCircle2 className="w-5 h-5 text-emerald-600" /></div>
-                    <div>
-                      <h4 className="font-bold text-foreground line-through decoration-muted-foreground">{task.task_description}</h4>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1"><span className="font-medium text-primary">{task.assignment_title}</span><span>•</span><span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{task.completed_at ? new Date(task.completed_at).toLocaleDateString() : task.scheduled_date}</span></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />{task.actual_minutes ?? task.estimated_minutes}m {task.actual_minutes ? 'actual' : 'estimated'}</Badge>
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(task)} aria-label="Edit completed task"><Pencil className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="icon" disabled={busyTaskId === task.id} onClick={() => void deleteTask(task.id)} aria-label="Delete completed task">{busyTaskId === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-500" />}</Button>
-                  </div>
-                </div>
-              ))}</div>
-            )}
-          </CardContent>
+      <main className="app-container app-page history-page">
+        <header className="history-heading">
+          <p className="app-eyebrow">Completed work</p>
+          <h1 className="app-page-heading">Completion History</h1>
+          <p>Review what you finished, how long it took, and the work building your momentum.</p>
+        </header>
+        <Card className="history-summary" aria-label="Completion summary">
+          <dl>
+            <div><dt>Tasks completed</dt><dd>{stats.totalTasks}</dd></div>
+            <div><dt>Study time</dt><dd>{Math.round(stats.totalMinutes / 60)} <span>hours</span></dd></div>
+            <div><dt>Last 7 days</dt><dd>{stats.weeklyTasks}</dd></div>
+          </dl>
         </Card>
-      </div>
+        <section className="history-activity" aria-labelledby="history-activity-title">
+          <div className="history-activity-heading">
+            <div><p className="app-eyebrow">Archive</p><h2 id="history-activity-title">Recent activity</h2></div>
+            <p>{filteredHistory.length} of {history.length} completed tasks</p>
+          </div>
+          <Card className="history-log">
+            <div className="history-toolbar">
+              <label className="history-search"><Search aria-hidden="true" /><Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search task or assignment" aria-label="Search completed tasks" /></label>
+              <div className="history-filters" aria-label="Filter completion history by difficulty">
+              {(['All', 'Easy', 'Medium', 'Hard'] as ComplexityFilter[]).map((level) => (
+                <button key={level} type="button" onClick={() => setComplexityFilter(level)} aria-pressed={complexityFilter === level} className={`${filterClassByLevel[level]} ${complexityFilter === level ? 'is-active' : ''}`}>{level}</button>
+              ))}
+              </div>
+            </div>
+            {filteredHistory.length === 0 ? <div className="history-empty">No completed tasks match your filters.</div> : (
+              <ol className="history-list">{filteredHistory.map((task) => (
+                <li key={task.id} className="history-row">
+                  <span className="history-complete-mark" aria-hidden="true"><CheckCircle2 /></span>
+                  <div className="history-task-copy">
+                    <h3>{task.task_description}</h3>
+                    <div className="history-task-meta"><span>{task.assignment_title}</span><span><Calendar />{task.completed_at ? new Date(task.completed_at).toLocaleDateString() : task.scheduled_date}</span><span className={difficultyClassByLevel[task.complexity]}>{task.complexity}</span></div>
+                  </div>
+                  <div className="history-row-actions">
+                    <Badge variant="outline" className="history-duration"><Clock />{task.actual_minutes ?? task.estimated_minutes}m <span>{task.actual_minutes ? 'actual' : 'estimated'}</span></Badge>
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(task)} aria-label="Edit completed task"><Pencil /></Button>
+                    <Button className="history-delete" variant="ghost" size="icon" disabled={busyTaskId === task.id} onClick={() => void deleteTask(task.id)} aria-label="Delete completed task">{busyTaskId === task.id ? <Loader2 className="animate-spin" /> : <Trash2 />}</Button>
+                  </div>
+                </li>
+              ))}</ol>
+            )}
+          </Card>
+        </section>
+      </main>
       <Dialog open={Boolean(editTask)} onOpenChange={(open) => { if (!open) setEditTask(null); }}>
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent className="history-edit-dialog">
           <DialogHeader><DialogTitle>Edit Completed Task</DialogTitle></DialogHeader>
-          <div className="grid gap-4 py-2">
+          <div className="history-edit-fields">
             <Field label="Task Description" id="task-desc"><Input id="task-desc" value={editForm.task_description} onChange={(event) => setEditForm((current) => ({ ...current, task_description: event.target.value }))} /></Field>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="history-edit-grid">
               <Field label="Scheduled Date" id="task-date"><Input id="task-date" type="date" value={editForm.scheduled_date} onChange={(event) => setEditForm((current) => ({ ...current, scheduled_date: event.target.value }))} /></Field>
               <Field label="Estimated" id="task-minutes"><Input id="task-minutes" type="number" min={1} max={720} value={editForm.estimated_minutes} onChange={(event) => setEditForm((current) => ({ ...current, estimated_minutes: event.target.value }))} /></Field>
               <Field label="Actual" id="actual-minutes"><Input id="actual-minutes" type="number" min={1} max={1440} value={editForm.actual_minutes} onChange={(event) => setEditForm((current) => ({ ...current, actual_minutes: event.target.value }))} placeholder="Optional" /></Field>
@@ -167,10 +184,6 @@ export default function History() {
   );
 }
 
-function StatCard({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
-  return <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle></CardHeader><CardContent><div className="text-4xl font-bold text-foreground flex items-center gap-2">{icon}{value}</div></CardContent></Card>;
-}
-
 function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
-  return <div className="grid gap-2"><Label htmlFor={id}>{label}</Label>{children}</div>;
+  return <div className="history-field"><Label htmlFor={id}>{label}</Label>{children}</div>;
 }

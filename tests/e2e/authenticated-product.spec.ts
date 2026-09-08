@@ -137,6 +137,58 @@ test('Dashboard creates an assignment and preserves semantic filtering controls'
   await expect(page.locator('.difficulty-hard')).toHaveText('Hard');
 });
 
+test('History filters, edits, and deletes completed work without changing its behavior', async ({ page }) => {
+  let deleted = false;
+  let task = {
+    id: 41,
+    assignment_id: 14,
+    task_description: 'Trace process creation calls',
+    assignment_title: 'Operating Systems lab',
+    complexity: 'Hard',
+    scheduled_date: '2026-09-07',
+    completed_at: new Date().toISOString(),
+    estimated_minutes: 45,
+    actual_minutes: 50,
+    completed: true,
+  };
+  await installAuthAndSettings(page, async (route, url) => {
+    const method = route.request().method();
+    if (url.pathname === '/api/history' && method === 'GET') return handled(route, deleted ? [] : [task]);
+    if (url.pathname === '/api/tasks/41' && method === 'PATCH') {
+      expect(route.request().postDataJSON()).toMatchObject({
+        task_description: 'Trace fork and waitpid calls',
+        actual_minutes: 55,
+        completed: true,
+      });
+      task = { ...task, task_description: 'Trace fork and waitpid calls', actual_minutes: 55 };
+      return handled(route, { message: 'Task updated' });
+    }
+    if (url.pathname === '/api/tasks/41' && method === 'DELETE') {
+      deleted = true;
+      return handled(route, { message: 'Task deleted' });
+    }
+    return undefined;
+  });
+  page.on('dialog', (dialog) => dialog.accept());
+
+  await page.goto('/history');
+  await expect(page.getByRole('heading', { name: 'Trace process creation calls' })).toBeVisible();
+  const hardFilter = page.getByRole('button', { name: 'Hard', exact: true });
+  await hardFilter.click();
+  await expect(hardFilter).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('Search completed tasks').fill('Operating Systems');
+
+  await page.getByRole('button', { name: 'Edit completed task' }).click();
+  await page.getByLabel('Task Description').fill('Trace fork and waitpid calls');
+  await page.getByLabel('Actual').fill('55');
+  await page.getByRole('button', { name: 'Save Changes' }).click();
+  await expect(page.getByRole('heading', { name: 'Trace fork and waitpid calls' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete completed task' }).click();
+  await expect.poll(() => deleted).toBe(true);
+  await expect(page.getByText('No completed tasks match your filters.')).toBeVisible();
+});
+
 test('Settings exposes planning controls and executes confirmed account deletion', async ({ page }) => {
   let deleted = false;
   await installAuthAndSettings(page, async (route, url) => {
