@@ -11,10 +11,17 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Assistant from './pages/Assistant';
 import { DEFAULT_SETTINGS } from './shared/settings/defaults';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, type ReactNode } from 'react';
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('app-ui', Boolean(user));
+    return () => root.classList.remove('app-ui');
+  }, [user]);
+
   return user ? <>{children}</> : <Navigate to="/login" />;
 };
 

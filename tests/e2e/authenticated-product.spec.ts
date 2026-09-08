@@ -61,6 +61,27 @@ test('Dashboard opens a published plan, completes work, and records plan feedbac
   expect(feedback).toBe('helpful');
 });
 
+test('authenticated shell exposes responsive navigation and active-page context', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installAuthAndSettings(page, async (route, url) => {
+    if (url.pathname === '/api/assignments' && route.request().method() === 'GET') {
+      return handled(route, []);
+    }
+    return undefined;
+  });
+
+  await page.goto('/dashboard');
+  await expect(page.locator('html')).toHaveClass(/app-ui/);
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('button', { name: 'Open account menu' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  for (const name of ['Assistant', 'Dashboard', 'Timeline', 'History']) {
+    const height = await page.getByRole('link', { name }).evaluate((element) => element.getBoundingClientRect().height);
+    expect(height).toBeGreaterThanOrEqual(44);
+  }
+});
+
 test('Settings exposes planning controls and executes confirmed account deletion', async ({ page }) => {
   let deleted = false;
   await installAuthAndSettings(page, async (route, url) => {
