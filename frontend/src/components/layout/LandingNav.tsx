@@ -43,7 +43,7 @@ const LandingNav = ({ theme, onToggleTheme }: LandingNavProps) => {
           >
             {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
-          <Link to="/login" className="product-nav-login">Log in</Link>
+          <Link to="/login" className="product-button product-button-secondary product-button-small product-nav-login">Log in</Link>
           <Link to="/signup" className="product-button product-button-small">Get started</Link>
         </nav>
       </div>

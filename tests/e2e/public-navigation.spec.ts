@@ -68,7 +68,10 @@ test('landing reflows at 200% text size and honors reduced motion', async ({ pag
   });
 
   for (const selector of ['.product-theme-toggle', '.product-nav-login', '.product-button-small']) {
-    const height = await page.locator(selector).evaluate((element) => element.getBoundingClientRect().height);
-    expect(height).toBeGreaterThanOrEqual(44);
+    const heights = await page.locator(selector).evaluateAll((elements) => (
+      elements.map((element) => element.getBoundingClientRect().height)
+    ));
+    expect(heights.length).toBeGreaterThan(0);
+    heights.forEach((height) => expect(height).toBeGreaterThanOrEqual(44));
   }
 });

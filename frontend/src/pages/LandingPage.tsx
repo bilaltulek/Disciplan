@@ -84,7 +84,7 @@ const LandingPage = () => {
               <p>Disciplan turns assignments into manageable work and keeps your plan visible as the week changes.</p>
               <div className="product-actions">
                 <Link to="/signup" className="product-button">Get started <ArrowRight size={16} /></Link>
-                <Link to="/login" className="product-link">Log in</Link>
+                <Link to="/login" className="product-button product-button-secondary">Log in</Link>
               </div>
             </div>
             <p className="product-trust-note"><span aria-hidden="true" />Assistant-proposed changes publish only after you approve them.</p>
