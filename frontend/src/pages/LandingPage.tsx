@@ -1,247 +1,220 @@
+import { useEffect, useState } from 'react';
+import { ArrowRight, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  ArrowRight,
-  BrainCircuit,
-  CalendarCheck2,
-  CheckCircle2,
-  Clock3,
-  History,
-  LayoutDashboard,
-  Network,
-  ShieldCheck,
-  Zap,
-} from 'lucide-react';
-import LandingNav from '@/components/layout/LandingNav';
+import LandingNav, { type LandingTheme } from '@/components/layout/LandingNav';
+import './landing.css';
 
-const howItWorks = [
-  {
-    icon: <CalendarCheck2 className="w-5 h-5 text-sky-600" />,
-    title: 'Create assignment',
-    description: 'Add your due date, workload, and difficulty in under a minute.',
-  },
-  {
-    icon: <BrainCircuit className="w-5 h-5 text-cyan-600" />,
-    title: 'AI breaks it down',
-    description: 'Disciplan generates day-by-day tasks with estimated study time.',
-  },
-  {
-    icon: <Network className="w-5 h-5 text-emerald-600" />,
-    title: 'Track and finish',
-    description: 'Complete tasks from Dashboard, Timeline, and History to stay on pace.',
-  },
+const LANDING_THEME_KEY = 'disciplan-landing-theme';
+
+const productFlow = [
+  { name: 'Dashboard', detail: 'Create and monitor assignments.' },
+  { name: 'Timeline', detail: 'Work through scheduled days.' },
+  { name: 'Assistant', detail: 'Explain, plan, or propose revisions.' },
+  { name: 'History', detail: 'Review completed work.' },
 ];
 
-const surfaces = [
-  {
-    icon: <LayoutDashboard className="w-5 h-5 text-sky-600" />,
-    title: 'Dashboard',
-    description: 'View all assignments, progress, and next actions in one place.',
-    bullets: ['Difficulty-tinted cards', 'Continue and delete actions'],
-    mock: (
-      <div className="space-y-2">
-        <div className="h-2 rounded-full bg-sky-400/70 w-9/12" />
-        <div className="h-2 rounded-full bg-white/70 w-11/12" />
-        <div className="h-2 rounded-full bg-emerald-300/70 w-7/12" />
-      </div>
-    ),
-  },
-  {
-    icon: <Network className="w-5 h-5 text-cyan-600" />,
-    title: 'Timeline',
-    description: 'Follow your scheduled tasks day by day and adjust quickly.',
-    bullets: ['Auto-focus on today', 'Hide completed items'],
-    mock: (
-      <div className="space-y-2">
-        <div className="h-2 rounded-full bg-cyan-400/70 w-6/12" />
-        <div className="h-2 rounded-full bg-white/70 w-10/12" />
-        <div className="h-2 rounded-full bg-white/70 w-8/12" />
-      </div>
-    ),
-  },
-  {
-    icon: <History className="w-5 h-5 text-amber-600" />,
-    title: 'History',
-    description: 'Review completed work and keep momentum visible over time.',
-    bullets: ['Search and filter by complexity', 'Weekly completion stats'],
-    mock: (
-      <div className="space-y-2">
-        <div className="h-2 rounded-full bg-amber-300/80 w-5/12" />
-        <div className="h-2 rounded-full bg-white/70 w-11/12" />
-        <div className="h-2 rounded-full bg-white/70 w-9/12" />
-      </div>
-    ),
-  },
-];
+const getInitialTheme = (): LandingTheme => {
+  try {
+    const saved = window.localStorage.getItem(LANDING_THEME_KEY);
+    if (saved === 'light' || saved === 'dark') return saved;
+  } catch {
+    // Storage can be unavailable in privacy-restricted browsing contexts.
+  }
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
 
-const features = [
-  {
-    icon: <BrainCircuit className="w-7 h-7 text-blue-500" />,
-    title: 'AI Task Breakdown',
-    desc: 'Turn large assignments into focused mini tasks mapped to real dates.',
-  },
-  {
-    icon: <Clock3 className="w-7 h-7 text-cyan-500" />,
-    title: 'Progress Visibility',
-    desc: 'Track completion percent and keep your workload realistic each day.',
-  },
-  {
-    icon: <Zap className="w-7 h-7 text-amber-500" />,
-    title: 'Fast Iteration',
-    desc: 'Edit or delete tasks quickly as plans change during the week.',
-  },
-];
+interface ProductVisualProps {
+  name: 'dashboard-overview' | 'dashboard-plan' | 'timeline' | 'assistant' | 'history';
+  alt: string;
+  theme: LandingTheme;
+  className?: string;
+  eager?: boolean;
+  forceDark?: boolean;
+  desktopHeight?: number;
+}
 
-const faqs = [
-  {
-    q: 'Do I need to manually create every study task?',
-    a: 'No. You create the assignment once, and Disciplan generates the detailed study plan.',
-  },
-  {
-    q: 'Can I adjust generated tasks later?',
-    a: 'Yes. You can edit, toggle, and delete tasks from Timeline and History views.',
-  },
-  {
-    q: 'Is my data tied to my account?',
-    a: 'Yes. Assignments and tasks are scoped to authenticated users.',
-  },
-];
+const ProductVisual = ({
+  name,
+  alt,
+  theme,
+  className = '',
+  eager = false,
+  forceDark = false,
+  desktopHeight = 825,
+}: ProductVisualProps) => {
+  const visualTheme = forceDark ? 'dark' : theme;
+  const base = `/landing/product/${name}-${visualTheme}`;
+  return (
+    <picture className={`product-visual ${className}`.trim()}>
+      <source media="(max-width: 699px)" srcSet={`${base}-mobile.webp`} />
+      <img
+        src={`${base}-desktop.webp`}
+        alt={alt}
+        width={1440}
+        height={desktopHeight}
+        loading={eager ? 'eager' : 'lazy'}
+        fetchPriority={eager ? 'high' : 'auto'}
+        decoding={eager ? 'sync' : 'async'}
+      />
+    </picture>
+  );
+};
 
-const LandingPage = () => (
-  <div className="page-shell">
-    <LandingNav />
+const LandingPage = () => {
+  const [theme, setTheme] = useState<LandingTheme>(getInitialTheme);
 
-    <section className="landing-section pt-16 md:pt-24 text-center">
-      <div className="max-w-3xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-3 py-1 mb-5 text-sm font-medium text-primary glass-chip rounded-full">
-          <ShieldCheck className="w-4 h-4" />
-          Built for consistent study momentum
-        </div>
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-foreground mb-6 text-balance">
-          Stop guessing what to study next
-        </h1>
-        <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-          Disciplan turns assignments into clear daily action across Dashboard, Timeline, and History.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link to="/signup">
-            <Button size="lg" className="px-8 text-base focus-visible:ring-2 focus-visible:ring-primary/60">
-              Get Started
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
-          <p className="text-sm text-muted-foreground">
-            Already have an account?
-            {' '}
-            <Link className="text-primary hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-sm" to="/login">Log in</Link>
-          </p>
-        </div>
-      </div>
-    </section>
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LANDING_THEME_KEY, theme);
+    } catch {
+      // The active page can still use the selected theme without persistence.
+    }
+  }, [theme]);
 
-    <section id="how-it-works" className="landing-section">
-      <div className="glass-panel rounded-3xl p-6 md:p-10">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-bold mb-2">How It Works</h2>
-          <p className="text-muted-foreground">Three steps from assignment to completion.</p>
-        </div>
-        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div className="hidden md:block absolute left-1/6 right-1/6 top-6 h-px bg-white/60" />
-          {howItWorks.map((step) => (
-            <Card key={step.title} className="relative glass-chip border-white/60">
-              <CardHeader>
-                <div className="w-10 h-10 rounded-full glass-chip flex items-center justify-center mb-3">
-                  {step.icon}
-                </div>
-                <CardTitle className="text-xl">{step.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{step.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
+  return (
+    <div className="product-landing" data-theme={theme}>
+      <a className="product-skip-link" href="#main-content">Skip to content</a>
+      <LandingNav theme={theme} onToggleTheme={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))} />
 
-    <section className="landing-section">
-      <div className="text-center mb-10">
-        <h2 className="text-3xl font-bold mb-2">See the Workspace</h2>
-        <p className="text-muted-foreground">Each view solves a different planning problem.</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {surfaces.map((surface) => (
-          <Card key={surface.title} className="glass-panel">
-            <CardHeader>
-              <div className="w-10 h-10 rounded-full glass-chip flex items-center justify-center mb-3">
-                {surface.icon}
+      <main id="main-content">
+        <section className="product-hero product-shell" aria-labelledby="landing-title">
+          <div className="product-hero-intro">
+            <div className="product-hero-copy">
+              <h1 id="landing-title">Know what to study next.</h1>
+              <p>Disciplan turns assignments into manageable work and keeps your plan visible as the week changes.</p>
+              <div className="product-actions">
+                <Link to="/signup" className="product-button">Get started <ArrowRight size={16} /></Link>
+                <Link to="/login" className="product-link">Log in</Link>
               </div>
-              <CardTitle>{surface.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">{surface.description}</p>
-              <ul className="text-sm space-y-1">
-                {surface.bullets.map((b) => (
-                  <li key={b} className="flex items-center gap-2 text-foreground">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                    {b}
-                  </li>
+            </div>
+            <p className="product-trust-note"><span aria-hidden="true" />Assistant-proposed changes publish only after you approve them.</p>
+          </div>
+
+          <figure className="product-hero-frame">
+            <ProductVisual
+              name="dashboard-overview"
+              theme={theme}
+              eager
+              desktopHeight={620}
+              alt="Disciplan Dashboard showing assignment cards, progress, due dates, and plan access."
+            />
+          </figure>
+        </section>
+
+        <section className="product-principle product-shell" aria-labelledby="principle-title">
+          <p className="product-label">One connected plan</p>
+          <h2 id="principle-title">A plan is useful only if it survives the week.</h2>
+          <p>Create it on Dashboard, work through it in Timeline, adjust with Assistant, and see the result in History.</p>
+        </section>
+
+        <section id="product" className="product-shell product-section" aria-labelledby="dashboard-title">
+          <div className="product-showcase product-dashboard-showcase">
+            <figure className="product-showcase-media">
+              <ProductVisual
+                name="dashboard-plan"
+                theme={theme}
+                desktopHeight={864}
+                alt="The real Disciplan Study Plan dialog showing generated tasks, scheduled dates, durations, completion controls, and plan feedback."
+              />
+            </figure>
+            <div className="product-showcase-copy">
+              <p className="product-label">Dashboard</p>
+              <h2 id="dashboard-title">Turn one assignment into a workable plan.</h2>
+              <p>Add the due date, workload, difficulty, and brief. Disciplan creates dated tasks with estimated study time.</p>
+              <p className="product-detail">Track progress from the same assignment card, reopen the plan, and mark individual tasks complete.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="timeline" className="product-shell product-section product-timeline-section" aria-labelledby="timeline-title">
+          <div className="product-showcase-copy">
+            <p className="product-label">Timeline</p>
+            <h2 id="timeline-title">Move through the work day by day.</h2>
+            <p>Timeline opens on today, keeps nearby dates in view, and lets you complete, edit, delete, or hide finished tasks.</p>
+          </div>
+          <figure className="product-timeline-frame">
+            <ProductVisual
+              name="timeline"
+              theme={theme}
+              desktopHeight={864}
+              alt="Disciplan Timeline focused on today with three scheduled tasks, completion status, durations, and nearby days in view."
+            />
+          </figure>
+        </section>
+
+        <section id="assistant" className="product-shell product-section" aria-labelledby="assistant-title">
+          <div className="product-assistant-showcase">
+            <header>
+              <div>
+                <p className="product-label">Assistant</p>
+                <h2 id="assistant-title">Get help without giving up control.</h2>
+              </div>
+              <p>Ask for an explanation, guided study session, resources, task breakdown, or schedule. Review proposed repairs before anything changes.</p>
+            </header>
+            <figure className="product-assistant-frame">
+              <ProductVisual
+                name="assistant"
+                theme={theme}
+                forceDark
+                desktopHeight={660}
+                alt="The real Disciplan Assistant showing a planning conversation and an approval-required schedule revision with Keep current plan and Approve changes choices."
+              />
+            </figure>
+          </div>
+        </section>
+
+        <section id="history" className="product-shell product-section" aria-labelledby="history-title">
+          <div className="product-history-showcase">
+            <div className="product-history-copy">
+              <p className="product-label">One workspace</p>
+              <h2 id="history-title">The same work, from plan to done.</h2>
+              <p>Every view answers a different question about the same assignments and tasks.</p>
+              <ol className="product-flow" aria-label="How Disciplan fits together">
+                {productFlow.map((item) => (
+                  <li key={item.name}><strong>{item.name}</strong><span>{item.detail}</span></li>
                 ))}
-              </ul>
-              <div className="rounded-xl border border-white/55 bg-white/40 p-3">
-                {surface.mock}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </section>
+              </ol>
+            </div>
+            <figure className="product-history-frame">
+              <ProductVisual
+                name="history"
+                theme={theme}
+                desktopHeight={720}
+                alt="Disciplan Completion History showing completed-task totals, study time, recent activity, and filters."
+              />
+            </figure>
+          </div>
+        </section>
 
-    <section id="features" className="landing-section">
-      <div className="text-center mb-10">
-        <h2 className="text-3xl font-bold mb-2">Built for High Achievers</h2>
-        <p className="text-muted-foreground">Practical tools for consistent output, not just motivation.</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {features.map((feature) => (
-          <Card key={feature.title} className="hover:shadow-lg transition-shadow glass-panel">
-            <CardHeader>
-              <div className="mb-3">{feature.icon}</div>
-              <CardTitle>{feature.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{feature.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+        <section className="product-shell product-final" aria-labelledby="final-title">
+          <div>
+            <p className="product-label">Start with the next assignment</p>
+            <h2 id="final-title">Make the next assignment easier to start.</h2>
+          </div>
+          <div className="product-final-actions">
+            <Link to="/signup" className="product-button product-button-inverse">Get started <ArrowRight size={16} /></Link>
+            <Link to="/login">Log in to your account</Link>
+          </div>
+        </section>
+      </main>
 
-      <div className="mt-8 glass-chip rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center md:justify-center gap-3 md:gap-6 text-sm">
-        <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-sky-600" /> Private account auth</span>
-        <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Task-level editing</span>
-        <span className="flex items-center gap-2"><Network className="w-4 h-4 text-cyan-600" /> Progress tracking</span>
-      </div>
-    </section>
-
-    <section className="landing-section pb-16 md:pb-24">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold text-center mb-6">FAQ</h2>
-        <div className="space-y-3">
-          {faqs.map((item) => (
-            <Card key={item.q} className="glass-chip">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{item.q}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{item.a}</p>
-              </CardContent>
-            </Card>
-          ))}
+      <footer className="product-footer">
+        <div className="product-shell product-footer-inner">
+          <Link to="/" className="product-wordmark" aria-label="Disciplan home">
+            <span className="product-wordmark-mark" aria-hidden="true"><BookOpen size={14} strokeWidth={1.8} /></span>
+            <span>Disciplan</span>
+          </Link>
+          <nav aria-label="Footer navigation">
+            <a href="#product">Product</a>
+            <a href="#timeline">Timeline</a>
+            <a href="#assistant">Assistant</a>
+            <a href="#history">History</a>
+          </nav>
+          <div className="product-footer-account"><Link to="/login">Log in</Link><Link to="/signup">Create account</Link></div>
         </div>
-      </div>
-    </section>
-  </div>
-);
+      </footer>
+    </div>
+  );
+};
 
 export default LandingPage;

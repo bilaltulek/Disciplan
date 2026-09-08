@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Button } from "@/components/ui/button";
+import { BookOpen, Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
 
-const LandingNav = () => {
+export type LandingTheme = 'light' | 'dark';
+
+interface LandingNavProps {
+  theme: LandingTheme;
+  onToggleTheme: () => void;
+}
+
+const LandingNav = ({ theme, onToggleTheme }: LandingNavProps) => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -14,36 +20,34 @@ const LandingNav = () => {
   }, []);
 
   return (
-    <nav
-      aria-label="Primary"
-      className={`landing-nav ${scrolled ? 'landing-nav-scrolled' : ''}`}
-    >
-      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
-        <Link to="/" className="inline-flex items-center gap-2 font-bold text-foreground tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md">
-          <span className="glass-accent p-2 rounded-xl"><BookOpen className="w-4 h-4" /></span>
-          <span className="text-xl">Disciplan</span>
+    <header className={`product-nav${scrolled ? ' is-scrolled' : ''}`}>
+      <div className="product-nav-inner">
+        <Link to="/" className="product-wordmark" aria-label="Disciplan home">
+          <span className="product-wordmark-mark" aria-hidden="true"><BookOpen size={17} strokeWidth={1.8} /></span>
+          <span>Disciplan</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6 text-sm">
-          <a className="landing-nav-link" href="#how-it-works">How it works</a>
-          <a className="landing-nav-link" href="#features">Features</a>
-        </div>
+        <nav className="product-nav-links" aria-label="Landing page sections">
+          <a href="#product">Product</a>
+          <a href="#timeline">Timeline</a>
+          <a href="#assistant">Assistant</a>
+        </nav>
 
-        <div className="flex items-center gap-2">
-          <Link to="/login">
-            <Button variant="ghost" className="landing-nav-link-btn">
-              Log In
-            </Button>
-          </Link>
-
-          <Link to="/signup" className="inline-flex">
-            <Button className="focus-visible:ring-2 focus-visible:ring-primary/60">
-              Sign Up
-            </Button>
-          </Link>
-        </div>
+        <nav className="product-nav-account" aria-label="Account">
+          <button
+            type="button"
+            className="product-theme-toggle"
+            onClick={onToggleTheme}
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+          <Link to="/login" className="product-nav-login">Log in</Link>
+          <Link to="/signup" className="product-button product-button-small">Get started</Link>
+        </nav>
       </div>
-    </nav>
+    </header>
   );
 };
 
