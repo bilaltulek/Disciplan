@@ -26,6 +26,13 @@ const main = async () => {
         reducedMotion: 'reduce',
       });
       const page = await context.newPage();
+      if (process.env.AUTH_CAPTURE_PROVIDERS === 'true') {
+        await page.route('**/api/auth/providers', (route) => route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ google: true, microsoft: true, sso: true }),
+        }));
+      }
       await page.addInitScript((theme) => window.localStorage.setItem('disciplan-landing-theme', theme), view.theme);
 
       for (const path of ['/login', '/signup']) {

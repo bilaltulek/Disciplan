@@ -132,6 +132,21 @@ Required variables:
 - `CORS_ORIGINS`
 - `NODE_ENV`
 
+Optional WorkOS AuthKit variables:
+
+- `WORKOS_API_KEY`, `WORKOS_CLIENT_ID`, and an exact `WORKOS_REDIRECT_URI`
+  ending in `/api/auth/callback`
+- `AUTH_GOOGLE_ENABLED`, `AUTH_MICROSOFT_ENABLED`, and `AUTH_SSO_ENABLED`
+  (each defaults to disabled)
+
+Provider controls remain hidden unless the shared WorkOS configuration and the
+individual provider flag are complete. Configure Microsoft's WorkOS social
+connection for both personal and work/school accounts. Enterprise SSO uses
+AuthKit discovery and accepts only SSO authentication from configured WorkOS
+organization connections. Production activation additionally requires an
+owned verified domain, exact provider redirect configuration, approved public
+Terms and Privacy documents, and accepted WorkOS production configuration.
+
 ## 🧪 Scripts
 
 Root:

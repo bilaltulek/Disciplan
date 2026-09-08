@@ -62,6 +62,23 @@ test('credential auth pages preserve routes, labels, focus order, and legal link
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('provider controls follow backend capabilities and preserve safe start routes', async ({ page }) => {
+  await page.route('**/api/auth/providers', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ google: true, microsoft: true, sso: true }),
+  }));
+  await page.goto('/login');
+
+  await expect(page.getByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', '/api/auth/google/start?intent=login');
+  await expect(page.getByRole('link', { name: 'Continue with Microsoft' })).toHaveAttribute('href', '/api/auth/microsoft/start?intent=login');
+  await expect(page.getByRole('link', { name: 'Continue with SSO' })).toHaveAttribute('href', '/api/auth/sso/start?intent=login');
+  await expect(page.getByText(/github/i)).toHaveCount(0);
+
+  await page.goto('/login?auth_error=email_unverified');
+  await expect(page.getByRole('alert')).toContainText('Verify your provider email');
+});
+
 test('auth pages remain usable at mobile width and 200% text size', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });

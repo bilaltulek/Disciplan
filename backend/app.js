@@ -11,6 +11,7 @@ const { dispatchRunBestEffort } = require('./infrastructure/best-effort-dispatch
 const { requestContext } = require('./http/middleware/request-context');
 const { appendCookie, csrfProtection } = require('./http/middleware/csrf');
 const { withErrorBoundary } = require('./http/middleware/error-boundary');
+const { createWorkosAuthRouter } = require('./http/routes/workos-auth');
 const { agentCapabilitiesForRequest, requireActiveAgentRuntime } = require('./http/middleware/agent-runtime');
 const {
   createAssignmentAndRun,
@@ -80,6 +81,14 @@ const setAuthCookie = (res, token) => {
   appendCookie(res, `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400;${secure}`);
 };
 
+app.use('/api/auth', createWorkosAuthRouter({
+  config,
+  issueToken,
+  setAuthCookie,
+  rateLimit: authRateLimit,
+  logger,
+}));
+
 app.get('/api/planning-profile', authenticateToken, withErrorBoundary(async (req, res) => {
   return res.json({ profile: await getPlanningProfile(req.user.id) });
 }));
@@ -118,7 +127,7 @@ app.post('/api/login', validateLogin, authRateLimit, withErrorBoundary(async (re
   const user = await findUserForLogin(email);
   if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
 
-  const isValid = await bcrypt.compare(password, user.password);
+  const isValid = typeof user.password === 'string' && await bcrypt.compare(password, user.password);
   if (!isValid) return res.status(401).json({ error: 'Invalid credentials.' });
 
   const token = issueToken(user.id);
@@ -399,6 +408,9 @@ app.delete('/api/account', authenticateToken, agentRateLimit, withErrorBoundary(
     verifyPassword: bcrypt.compare,
     cancelProviderRun,
   });
+  if (result.reauthRequired) {
+    return res.status(409).json({ error: 'Provider reauthentication is required before account deletion.', code: 'PROVIDER_REAUTH_REQUIRED' });
+  }
   if (!result.verified) return res.status(403).json({ error: 'Password confirmation failed.' });
   appendCookie(res, `token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0;${config.cookieSecure ? ' Secure;' : ''}`);
   return res.json({ message: 'Account deleted.' });

@@ -37,6 +37,31 @@ describe.skipIf(!enabled)('Postgres migration integration', () => {
     );
     expect(tables.rows).toHaveLength(4);
     const ledger = await pool.query('SELECT filename FROM schema_migrations ORDER BY filename');
-    expect(ledger.rows.at(-1)?.filename).toBe('009_conversation_context.sql');
+    expect(ledger.rows.at(-1)?.filename).toBe('010_workos_auth.sql');
+  }, 120_000);
+
+  it('supports provider-only identities without changing local ownership IDs', async () => {
+    await runMigrations({ client: pool });
+    const providerUser = await pool.query(
+      `INSERT INTO users (email,password,name,workos_user_id,email_verified)
+       VALUES ('provider@example.test',NULL,'Provider Student','user_test_provider',TRUE)
+       RETURNING id`,
+    );
+    await pool.query(
+      `INSERT INTO assignments (user_id,title,complexity,due_date,total_items)
+       VALUES ($1,'Provider assignment','Medium','2030-01-10',5)`,
+      [providerUser.rows[0].id],
+    );
+
+    expect((await pool.query('SELECT user_id FROM assignments WHERE title=$1', ['Provider assignment'])).rows[0].user_id)
+      .toBe(providerUser.rows[0].id);
+    await expect(pool.query(
+      `INSERT INTO users (email,password,name,workos_user_id)
+       VALUES ('invalid@example.test',NULL,'Invalid',NULL)`,
+    )).rejects.toMatchObject({ code: '23514' });
+    await expect(pool.query(
+      `INSERT INTO users (email,password,name,workos_user_id)
+       VALUES ('duplicate@example.test',NULL,'Duplicate','user_test_provider')`,
+    )).rejects.toMatchObject({ code: '23505' });
   }, 120_000);
 });

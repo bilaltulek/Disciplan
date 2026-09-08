@@ -75,6 +75,11 @@ const MIGRATION_REQUIREMENTS = {
     'column:agent_threads.summary_through_message_id',
     'column:agent_runs.resume_count',
   ],
+  '010_workos_auth.sql': [
+    'column:users.workos_user_id',
+    'column:users.email_verified',
+    'table:auth_oauth_states',
+  ],
 };
 
 const classifyMigrationState = (availableObjects) => Object.fromEntries(

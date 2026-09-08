@@ -38,6 +38,7 @@ const toPositiveFloat = (value, fallback, name) => {
 };
 
 const parseOrigins = (raw) => (raw || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+const toBoolean = (value) => value === 'true';
 const toEnum = (value, fallback, allowed, name) => {
   const selected = value || fallback;
   if (!allowed.includes(selected)) {
@@ -48,6 +49,19 @@ const toEnum = (value, fallback, allowed, name) => {
 const previewOrigin = () => {
   if (process.env.VERCEL_ENV !== 'preview' || !process.env.VERCEL_URL) return [];
   return [`https://${process.env.VERCEL_URL.trim()}`];
+};
+const isValidWorkosRedirectUri = (value) => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    const allowedProtocol = parsed.protocol === 'https:' || (!isProduction && parsed.protocol === 'http:');
+    return allowedProtocol
+      && parsed.pathname === '/api/auth/callback'
+      && !parsed.search
+      && !parsed.hash;
+  } catch {
+    return false;
+  }
 };
 const isProduction = process.env.NODE_ENV === 'production';
 const agentRolloutMode = toEnum(
@@ -184,6 +198,17 @@ const config = {
     ? isProduction
     : process.env.COOKIE_SECURE === 'true',
   isProduction,
+  workos: {
+    apiKey: (process.env.WORKOS_API_KEY || '').trim(),
+    clientId: (process.env.WORKOS_CLIENT_ID || '').trim(),
+    redirectUri: (process.env.WORKOS_REDIRECT_URI || '').trim(),
+    redirectUriValid: isValidWorkosRedirectUri((process.env.WORKOS_REDIRECT_URI || '').trim()),
+    enabled: {
+      google: toBoolean(process.env.AUTH_GOOGLE_ENABLED),
+      microsoft: toBoolean(process.env.AUTH_MICROSOFT_ENABLED),
+      sso: toBoolean(process.env.AUTH_SSO_ENABLED),
+    },
+  },
 };
 
 if (config.aiBudgetHardStopUsd > config.aiBudgetMonthlyUsd) {

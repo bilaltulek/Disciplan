@@ -1,10 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PublicAuthLayout from '@/components/layout/PublicAuthLayout';
+import AuthProviders from '@/components/auth/AuthProviders';
+import { authErrorMessage } from '@/components/auth/auth-errors';
 import { useAuth } from '@/context/AuthContext';
 
 const LoginPage = () => {
   const { login } = useAuth();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,11 +53,14 @@ const LoginPage = () => {
             required
           />
         </div>
-        {error && <p className="public-auth-error" role="alert">{error}</p>}
+        {(error || authErrorMessage(searchParams.get('auth_error'))) && (
+          <p className="public-auth-error" role="alert">{error || authErrorMessage(searchParams.get('auth_error'))}</p>
+        )}
         <button className="public-auth-submit" type="submit" disabled={loading}>
           {loading ? 'Logging in…' : 'Log in'}
         </button>
       </form>
+      <AuthProviders intent="login" />
       <p className="public-auth-switch">Don&apos;t have an account?<Link to="/signup">Create account</Link></p>
     </PublicAuthLayout>
   );

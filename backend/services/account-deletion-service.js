@@ -16,7 +16,15 @@ const deleteAccount = async ({
       [userId],
     );
     const user = userResult.rows[0];
-    if (!user || !await verifyPassword(password, user.password)) {
+    if (!user) {
+      await cancellationClient.query('ROLLBACK');
+      return { verified: false, deleted: false };
+    }
+    if (typeof user.password !== 'string') {
+      await cancellationClient.query('ROLLBACK');
+      return { verified: false, deleted: false, reauthRequired: true };
+    }
+    if (!await verifyPassword(password, user.password)) {
       await cancellationClient.query('ROLLBACK');
       return { verified: false, deleted: false };
     }

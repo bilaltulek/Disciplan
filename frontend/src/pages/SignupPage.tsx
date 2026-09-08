@@ -1,10 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PublicAuthLayout from '@/components/layout/PublicAuthLayout';
+import AuthProviders from '@/components/auth/AuthProviders';
+import { authErrorMessage } from '@/components/auth/auth-errors';
 import { useAuth } from '@/context/AuthContext';
 
 const SignupPage = () => {
   const { register } = useAuth();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -63,11 +66,14 @@ const SignupPage = () => {
             required
           />
         </div>
-        {error && <p className="public-auth-error" role="alert">{error}</p>}
+        {(error || authErrorMessage(searchParams.get('auth_error'))) && (
+          <p className="public-auth-error" role="alert">{error || authErrorMessage(searchParams.get('auth_error'))}</p>
+        )}
         <button className="public-auth-submit" type="submit" disabled={loading}>
           {loading ? 'Creating account…' : 'Create account'}
         </button>
       </form>
+      <AuthProviders intent="signup" />
       <p className="public-auth-switch">Already have an account?<Link to="/login">Log in</Link></p>
       <p className="public-auth-notice">
         By creating an account, you confirm you are at least 13 and agree to the <Link to="/terms">Terms</Link> and acknowledge the <Link to="/privacy">Privacy Policy</Link>.

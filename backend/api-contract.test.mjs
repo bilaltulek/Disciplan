@@ -9,6 +9,12 @@ describe('public API behavioral baseline', () => {
     expect(response.body).toEqual({ status: 'ok' });
   });
 
+  it('keeps external providers public, minimal, and disabled by default', async () => {
+    const response = await request(app).get('/api/auth/providers');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ google: false, microsoft: false, sso: false });
+  });
+
   it('validates registration before attempting persistence', async () => {
     const response = await request(app).post('/api/register').send({
       name: '', email: 'not-an-email', password: 'short',

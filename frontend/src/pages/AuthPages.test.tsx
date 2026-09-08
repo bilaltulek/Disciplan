@@ -9,11 +9,14 @@ import LegalPage from './LegalPage';
 const authMocks = vi.hoisted(() => ({
   login: vi.fn(),
   register: vi.fn(),
+  apiRequest: vi.fn(),
 }));
 
 vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({ login: authMocks.login, register: authMocks.register }),
 }));
+
+vi.mock('@/shared/api/client', () => ({ apiRequest: authMocks.apiRequest }));
 
 const renderPage = (page: ReactNode) => render(<MemoryRouter>{page}</MemoryRouter>);
 
@@ -23,6 +26,7 @@ describe('public authentication pages', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }));
     authMocks.login.mockReset();
     authMocks.register.mockReset();
+    authMocks.apiRequest.mockReset().mockResolvedValue({ google: false, microsoft: false, sso: false });
   });
 
   afterEach(() => {
@@ -84,5 +88,20 @@ describe('public authentication pages', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(5);
     expect(screen.getByText('Draft for owner and legal review')).toBeInTheDocument();
+  });
+
+  it('shows only providers reported as fully configured and never shows GitHub', async () => {
+    authMocks.apiRequest.mockResolvedValue({ google: true, microsoft: false, sso: true });
+    renderPage(<LoginPage />);
+
+    expect(await screen.findByRole('link', { name: 'Continue with Google' })).toHaveAttribute('href', '/api/auth/google/start?intent=login');
+    expect(screen.getByRole('link', { name: 'Continue with SSO' })).toHaveAttribute('href', '/api/auth/sso/start?intent=login');
+    expect(screen.queryByRole('link', { name: /microsoft/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/github/i)).not.toBeInTheDocument();
+  });
+
+  it('announces safe provider callback errors', () => {
+    render(<MemoryRouter initialEntries={['/login?auth_error=state_invalid']}><LoginPage /></MemoryRouter>);
+    expect(screen.getByRole('alert')).toHaveTextContent('expired or was already used');
   });
 });

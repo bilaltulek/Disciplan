@@ -101,4 +101,25 @@ describe('runtime-scoped configuration secrets', () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('may run only in Vercel Preview');
   });
+
+  it('keeps WorkOS providers disabled unless credentials, callback, and flags are complete', () => {
+    const disabled = runConfigProbe("process.stdout.write('WORKOS_CONFIG:' + JSON.stringify(config.workos));", {
+      AGENT_ROLLOUT_MODE: 'off',
+      WORKOS_API_KEY: '', WORKOS_CLIENT_ID: '', WORKOS_REDIRECT_URI: '',
+      AUTH_GOOGLE_ENABLED: 'true',
+    });
+    expect(disabled.status).toBe(0);
+    expect(JSON.parse(disabled.stdout.match(/WORKOS_CONFIG:(\{.*\})$/s)?.[1] || '{}'))
+      .toMatchObject({ redirectUriValid: false, enabled: { google: true } });
+
+    const configured = runConfigProbe("process.stdout.write('WORKOS_CONFIG:' + JSON.stringify(config.workos));", {
+      AGENT_ROLLOUT_MODE: 'off',
+      WORKOS_API_KEY: 'sk_test_example', WORKOS_CLIENT_ID: 'client_example',
+      WORKOS_REDIRECT_URI: 'https://preview.example.test/api/auth/callback',
+      AUTH_MICROSOFT_ENABLED: 'true',
+    });
+    expect(configured.status).toBe(0);
+    expect(JSON.parse(configured.stdout.match(/WORKOS_CONFIG:(\{.*\})$/s)?.[1] || '{}'))
+      .toMatchObject({ redirectUriValid: true, enabled: { microsoft: true } });
+  });
 });
