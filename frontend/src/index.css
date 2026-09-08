@@ -148,6 +148,8 @@
     @apply bg-background text-foreground;
     font-family: "Manrope", sans-serif;
     min-height: 100vh;
+  }
+  html:not([data-landing-theme]) body {
     background-image:
       radial-gradient(circle at 16% 18%, rgba(87, 197, 255, 0.28), transparent 28%),
       radial-gradient(circle at 86% 12%, rgba(174, 122, 255, 0.22), transparent 30%),
@@ -155,12 +157,20 @@
       linear-gradient(170deg, #f8fbff 0%, #e8f0ff 44%, #e5ebf9 100%);
     background-attachment: fixed;
   }
-  .dark body {
+  .dark:not([data-landing-theme]) body {
     background-image:
       radial-gradient(circle at 16% 18%, rgba(14, 165, 233, 0.18), transparent 30%),
       radial-gradient(circle at 84% 14%, rgba(56, 189, 248, 0.14), transparent 34%),
       radial-gradient(circle at 26% 88%, rgba(16, 185, 129, 0.12), transparent 30%),
       linear-gradient(165deg, #0a1222 0%, #111b2f 48%, #0a1020 100%);
+  }
+  html[data-landing-theme='light'] body {
+    background: #f7f7f5;
+    background-image: none;
+  }
+  html[data-landing-theme='dark'] body {
+    background: #111211;
+    background-image: none;
   }
   html.app-ui body {
     background: hsl(var(--background));

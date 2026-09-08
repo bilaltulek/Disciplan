@@ -6,6 +6,28 @@ test('public landing page exposes authentication entry points', async ({ page })
   await expect(page.getByRole('link', { name: /get started/i }).first()).toHaveAttribute('href', '/signup');
 });
 
+test('landing paints its stored neutral theme before the React bundle runs', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('disciplan-landing-theme', 'dark'));
+  await page.route('**/src/main.jsx', (route) => route.abort());
+  await page.goto('/');
+
+  const initialPaint = await page.evaluate(() => ({
+    theme: document.documentElement.dataset.landingTheme,
+    html: getComputedStyle(document.documentElement).backgroundColor,
+    body: getComputedStyle(document.body).backgroundColor,
+    root: getComputedStyle(document.getElementById('root')!).backgroundColor,
+    bodyImage: getComputedStyle(document.body).backgroundImage,
+  }));
+
+  expect(initialPaint).toEqual({
+    theme: 'dark',
+    html: 'rgb(17, 18, 17)',
+    body: 'rgb(17, 18, 17)',
+    root: 'rgb(17, 18, 17)',
+    bodyImage: 'none',
+  });
+});
+
 test('product-first landing presents real application sections and local theme control', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('disciplan-landing-theme', 'light'));
   await page.goto('/');

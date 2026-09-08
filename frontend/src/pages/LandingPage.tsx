@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { ArrowRight, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import LandingNav, { type LandingTheme } from '@/components/layout/LandingNav';
@@ -63,6 +63,16 @@ const ProductVisual = ({
 const LandingPage = () => {
   const [theme, setTheme] = useState<LandingTheme>(getInitialTheme);
 
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.landingTheme = theme;
+    root.style.colorScheme = theme;
+    return () => {
+      delete root.dataset.landingTheme;
+      root.style.removeProperty('color-scheme');
+    };
+  }, [theme]);
+
   useEffect(() => {
     try {
       window.localStorage.setItem(LANDING_THEME_KEY, theme);
@@ -84,7 +94,7 @@ const LandingPage = () => {
               <p>Disciplan turns assignments into manageable work and keeps your plan visible as the week changes.</p>
               <div className="product-actions">
                 <Link to="/signup" className="product-button">Get started <ArrowRight size={16} /></Link>
-                <Link to="/login" className="product-button product-button-secondary">Log in</Link>
+                <Link to="/login" className="product-link">Log in</Link>
               </div>
             </div>
             <p className="product-trust-note"><span aria-hidden="true" />Assistant-proposed changes publish only after you approve them.</p>

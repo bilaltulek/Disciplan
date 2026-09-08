@@ -45,7 +45,8 @@ describe('product-first landing page', () => {
 
     expect(screen.getAllByRole('link', { name: /get started/i })[0]).toHaveAttribute('href', '/signup');
     expect(screen.getAllByRole('link', { name: /log in/i })[0]).toHaveAttribute('href', '/login');
-    expect(container.querySelector('.product-actions a[href="/login"]')).toHaveClass('product-button-secondary');
+    expect(container.querySelector('.product-actions a[href="/login"]')).toHaveClass('product-link');
+    expect(container.querySelector('.product-actions a[href="/login"]')).not.toHaveClass('product-button');
     expect(container.querySelector('.product-nav-login')).toHaveClass('product-button-secondary');
     expect(screen.getAllByRole('link', { name: 'Product' })[0]).toHaveAttribute('href', '#product');
     expect(screen.getAllByRole('link', { name: 'Timeline' })[0]).toHaveAttribute('href', '#timeline');
@@ -63,9 +64,11 @@ describe('product-first landing page', () => {
     const dashboardImage = screen.getByAltText(/Dashboard showing assignment cards/i);
 
     expect(root).toHaveAttribute('data-theme', 'dark');
+    expect(document.documentElement).toHaveAttribute('data-landing-theme', 'dark');
     expect(dashboardImage).toHaveAttribute('src', expect.stringContaining('dashboard-overview-dark-desktop.webp'));
     fireEvent.click(screen.getByRole('button', { name: 'Switch to light theme' }));
     expect(root).toHaveAttribute('data-theme', 'light');
+    expect(document.documentElement).toHaveAttribute('data-landing-theme', 'light');
     expect(dashboardImage).toHaveAttribute('src', expect.stringContaining('dashboard-overview-light-desktop.webp'));
     await waitFor(() => expect(window.localStorage.getItem('disciplan-landing-theme')).toBe('light'));
   });

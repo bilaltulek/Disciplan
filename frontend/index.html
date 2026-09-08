@@ -5,6 +5,34 @@
     <link rel="icon" type="image/svg+xml" href="/favicon-book-open.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Disciplan</title>
+    <script>
+      (() => {
+        if (window.location.pathname !== '/') return;
+        let storedTheme;
+        try {
+          storedTheme = window.localStorage.getItem('disciplan-landing-theme');
+        } catch {
+          // A system preference still provides a stable first paint when storage is unavailable.
+        }
+        const theme = storedTheme === 'light' || storedTheme === 'dark'
+          ? storedTheme
+          : window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.landingTheme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <style>
+      html[data-landing-theme],
+      html[data-landing-theme] body,
+      html[data-landing-theme] #root { min-height: 100%; }
+      html[data-landing-theme='light'],
+      html[data-landing-theme='light'] body,
+      html[data-landing-theme='light'] #root { background: #f7f7f5; }
+      html[data-landing-theme='dark'],
+      html[data-landing-theme='dark'] body,
+      html[data-landing-theme='dark'] #root { background: #111211; }
+      html[data-landing-theme] body { margin: 0; background-image: none; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

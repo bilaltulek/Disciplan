@@ -234,13 +234,30 @@
   line-height: 1.6;
 }
 
-.product-actions { display: flex; align-items: center; gap: 12px; margin-top: 36px; }
+.product-actions { display: flex; align-items: center; gap: 24px; margin-top: 30px; }
+
+.product-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 1px;
+  border-bottom: 1px solid transparent;
+  color: var(--product-muted) !important;
+  font-size: 15px;
+  font-weight: 540;
+}
+
+.product-link:hover,
+.product-link:focus-visible {
+  border-bottom-color: var(--product-border-strong);
+  color: var(--product-ink) !important;
+}
 
 .product-trust-note {
   max-width: 260px;
-  margin-bottom: 2px;
-  padding: 12px 0 12px 20px;
-  border-left: 1px solid var(--product-border-strong);
+  align-self: end;
+  justify-self: end;
+  padding-bottom: 5px;
   color: var(--product-muted);
   font-size: 14px;
   line-height: 1.55;
@@ -254,8 +271,8 @@
   background: var(--product-ink);
 }
 
-.product-hero-frame {
-  margin-top: 65px;
+.product-landing .product-hero-frame {
+  margin-top: 38px;
   padding: 12px;
   overflow: hidden;
   border: 1px solid var(--product-border);
@@ -497,9 +514,9 @@
   .product-hero { padding-top: 64px; }
   .product-hero h1 { max-width: 520px; font-size: clamp(3rem, 14.6vw, 4rem); line-height: 1; }
   .product-hero-copy > p { margin-top: 21px; font-size: 17px; }
-  .product-actions { margin-top: 27px; }
-  .product-trust-note { padding: 11px 0 11px 15px; font-size: 13px; }
-  .product-hero-frame { margin-top: 45px; padding: 7px; border-radius: 15px; }
+  .product-actions { margin-top: 28px; }
+  .product-trust-note { justify-self: start; padding-bottom: 0; font-size: 13px; }
+  .product-landing .product-hero-frame { margin-top: 38px; padding: 7px; border-radius: 15px; }
   .product-visual { border-radius: 9px; }
 
   .product-principle { gap: 18px; padding-top: 78px; }
@@ -549,7 +566,7 @@
   .product-nav-inner { width: calc(100% - 32px); }
   .product-button-small { font-size: 13px; }
   .product-hero h1 { font-size: 2.85rem; }
-  .product-actions { gap: 16px; }
+  .product-actions { gap: 20px; }
   .product-dashboard-showcase .product-showcase-media { margin-inline: -7px; }
 }
 
