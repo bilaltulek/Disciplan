@@ -68,7 +68,7 @@ const getAuthorizationUrl = ({ config, provider, intent, state, client = createW
     redirectUri: config.workos.redirectUri,
     provider: providerConfig.workosProvider,
     providerScopes: provider === 'google' ? ['openid', 'email', 'profile'] : undefined,
-    screenHint: intent === 'signup' ? 'sign-up' : 'sign-in',
+    ...(provider === 'sso' ? { screenHint: intent === 'signup' ? 'sign-up' : 'sign-in' } : {}),
     state,
   });
 };

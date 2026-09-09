@@ -55,10 +55,30 @@ describe('WorkOS authentication service', () => {
     const config = { workos: { clientId: 'client', redirectUri: 'https://app.test/api/auth/callback' } };
     expect(getAuthorizationUrl({ config, provider: 'google', intent: 'signup', state: 'state', client })).toContain('workos.com');
     expect(getUrl).toHaveBeenCalledWith(expect.objectContaining({
-      provider: 'GoogleOAuth', providerScopes: ['openid', 'email', 'profile'], screenHint: 'sign-up', state: 'state',
+      provider: 'GoogleOAuth', providerScopes: ['openid', 'email', 'profile'], state: 'state',
+    }));
+    expect(getUrl.mock.calls[0][0]).not.toHaveProperty('screenHint');
+
+    getAuthorizationUrl({ config, provider: 'sso', intent: 'signup', state: 'state', client });
+    expect(getUrl).toHaveBeenLastCalledWith(expect.objectContaining({
+      provider: 'authkit', screenHint: 'sign-up', state: 'state',
     }));
     expect(authenticationMatchesProvider('sso', 'SSO')).toBe(true);
     expect(authenticationMatchesProvider('sso', 'GoogleOAuth')).toBe(false);
+  });
+
+  it('builds social authorization URLs with the real SDK validation rules', () => {
+    const config = {
+      workos: {
+        apiKey: 'sk_test_placeholder',
+        clientId: 'client_placeholder',
+        redirectUri: 'https://app.test/api/auth/callback',
+      },
+    };
+    for (const provider of ['google', 'microsoft']) {
+      const url = new URL(getAuthorizationUrl({ config, provider, intent: 'signup', state: 'state' }));
+      expect(url.searchParams.get('screen_hint')).toBeNull();
+    }
   });
 
   it('requires a verified identity and never silently merges an email account', async () => {
