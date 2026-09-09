@@ -79,15 +79,27 @@ describe('public authentication pages', () => {
     await waitFor(() => expect(authMocks.register).toHaveBeenCalledWith('Alex Student', 'alex@example.com', 'secure-password'));
   });
 
-  it('uses the stored neutral theme and exposes legal document structure', () => {
+  it('uses the stored neutral theme and exposes the published privacy policy', () => {
     window.localStorage.setItem('disciplan-landing-theme', 'dark');
     const { container } = renderPage(<LegalPage document="privacy" />);
 
     expect(container.querySelector('.public-auth')).toHaveAttribute('data-theme', 'dark');
     expect(document.documentElement).toHaveAttribute('data-landing-theme', 'dark');
     expect(screen.getByRole('heading', { level: 1, name: 'Privacy Policy' })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(5);
-    expect(screen.getByText('Draft for owner and legal review')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(11);
+    expect(screen.getByText('Effective September 8, 2026')).toBeInTheDocument();
+    expect(screen.getByText(/does not sell personal data, use student data for advertising/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute('href', 'mailto:disciplansupport@gmail.com');
+    expect(screen.queryByText(/draft for owner/i)).not.toBeInTheDocument();
+  });
+
+  it('publishes the operator and governing law in the terms', () => {
+    renderPage(<LegalPage document="terms" />);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Terms of Service' })).toBeInTheDocument();
+    expect(screen.getByText(/operated by Bilal Tulek in Texas, United States/i)).toBeInTheDocument();
+    expect(screen.getByText(/governed by the laws of the State of Texas/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
   });
 
   it('shows only providers reported as fully configured and never shows GitHub', async () => {

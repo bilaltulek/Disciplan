@@ -62,6 +62,18 @@ test('credential auth pages preserve routes, labels, focus order, and legal link
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('published legal documents identify the operator and privacy commitments', async ({ page }) => {
+  await page.goto('/terms');
+  await expect(page.getByText('Effective September 8, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText(/operated by Bilal Tulek in Texas, United States/i)).toBeVisible();
+  await expect(page.getByText(/draft for owner/i)).toHaveCount(0);
+
+  await page.goto('/privacy');
+  await expect(page.getByText(/does not sell personal data, use student data for advertising/i)).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Contact' })).toHaveAttribute('href', 'mailto:disciplansupport@gmail.com');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('provider controls follow backend capabilities and preserve safe start routes', async ({ page }) => {
   await page.route('**/api/auth/providers', (route) => route.fulfill({
     status: 200,

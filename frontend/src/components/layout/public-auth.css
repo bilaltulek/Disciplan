@@ -309,6 +309,15 @@
 
 .public-legal-back:hover { text-decoration: underline; }
 
+.public-legal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 44px;
+}
+
+.public-legal-actions .public-legal-back { margin-top: 0; }
+
 @media (max-width: 640px) {
   .public-auth-wordmark { top: 18px; left: 20px; }
   .public-auth-main { padding-block: 106px 46px; }
