@@ -172,7 +172,7 @@ const createMessageRun = async ({ userId, threadId, content, assignmentId, reply
   }
 };
 
-module.exports = {
+export = {
   createMessageRun,
   createThreadForUser,
   getThreadForUser,

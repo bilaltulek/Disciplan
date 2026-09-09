@@ -168,7 +168,7 @@ const resolveWorkosIdentity = async ({ identity, intent }: any, database: any = 
   }
 };
 
-module.exports = {
+export = {
   INTENTS,
   PROVIDERS,
   STATE_TTL_MS,

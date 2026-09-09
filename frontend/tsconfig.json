@@ -12,11 +12,13 @@
     "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"], "@contracts": ["../shared/contracts"] }
   },
-  "include": ["src", "../shared/contracts.ts", "vite.config.ts"],
+  "include": ["src", "../shared/contracts.ts"],
   "exclude": ["dist", "node_modules"]
 }

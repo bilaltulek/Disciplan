@@ -5,11 +5,11 @@ const dotenv = require('dotenv');
 
 const projectRef = process.argv[2];
 if (!/^proj_[a-z0-9]+$/.test(projectRef || '')) {
-  throw new Error('Usage: node backend/scripts/deploy-preview-runtime.js proj_<preview-project-ref>');
+  throw new Error('Usage: npm run deploy:preview-runtime -- proj_<preview-project-ref>');
 }
 
-const executable = (name) => process.platform === 'win32' ? `${name}.cmd` : name;
-const run = (command, args, options = {}) => {
+const executable = (name: any) => process.platform === 'win32' ? `${name}.cmd` : name;
+const run = (command: any, args: any, options: any = {}) => {
   const result = spawnSync(executable(command), args, {
     cwd: process.cwd(), stdio: 'inherit', shell: process.platform === 'win32', ...options,
   });
@@ -18,7 +18,7 @@ const run = (command, args, options = {}) => {
   }
 };
 
-const canonicalDatabase = (raw) => {
+const canonicalDatabase = (raw: any) => {
   const url = new URL(raw);
   return {
     host: url.hostname.replace('-pooler.', '.'),
@@ -43,7 +43,7 @@ try {
     throw new Error('The preview worker database must remain distinct from the local Production DATABASE_URL.');
   }
 
-  const environment = {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     DATABASE_URL: local.AGENT_DATABASE_URL,
     AGENT_DATABASE_URL: local.AGENT_DATABASE_URL,

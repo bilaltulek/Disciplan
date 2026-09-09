@@ -72,7 +72,7 @@ const updatePlanningProfile = async ({ userId, expectedVersion, profile }: any) 
   return result.rows[0] ? { profile: result.rows[0] } : { conflict: true };
 };
 
-module.exports = {
+export = {
   DEFAULT_WEEKDAY_MINUTES,
   defaultPlanningProfile,
   getPlanningProfile,

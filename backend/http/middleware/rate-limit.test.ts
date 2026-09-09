@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const require = createRequire(import.meta.url);
 const db = require('../../db');
 const { createRateLimiter, hashKey } = require('./rate-limit');
 

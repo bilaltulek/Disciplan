@@ -1,4 +1,5 @@
 const path = require('path');
+import type { EnvironmentConfiguration } from './types.js';
 const {
   assertMatchingValidationDatabases, assertPreviewRuntimeConfiguration, createAgentExecutionPolicy,
 } = require('./domain/agent-execution-policy');
@@ -148,7 +149,7 @@ assertPreviewRuntimeConfiguration({
   agentDatabaseUrl,
 });
 
-const config = {
+const config: EnvironmentConfiguration = {
   port: toInt(process.env.PORT, 5000),
   // Secrets are resolved only by the runtime that actually consumes them.
   // Trigger task bundles can import shared configuration without receiving the
@@ -227,4 +228,4 @@ if (config.isProduction && process.env.LANGSMITH_TRACING === 'true') {
   throw new Error('Raw LangSmith tracing is disabled in production by the Disciplan retention policy.');
 }
 
-module.exports = config;
+export = config;

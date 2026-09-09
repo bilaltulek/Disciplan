@@ -13,4 +13,4 @@ const withErrorBoundary = (handler: any) => async (req: any, res: any) => {
   }
 };
 
-module.exports = { withErrorBoundary };
+export = { withErrorBoundary };

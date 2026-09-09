@@ -327,7 +327,7 @@ const getBudgetGuardDecision = async (userId: any) => {
   };
 };
 
-module.exports = {
+export = {
   STATUS,
   extractUsageMetadata,
   estimateCostMicroUsd,

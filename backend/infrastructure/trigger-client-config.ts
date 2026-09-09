@@ -19,4 +19,4 @@ const loadConfiguredTriggerSdk = async () => {
   return sdk;
 };
 
-module.exports = { getTriggerClientConfiguration, loadConfiguredTriggerSdk };
+export = { getTriggerClientConfiguration, loadConfiguredTriggerSdk };

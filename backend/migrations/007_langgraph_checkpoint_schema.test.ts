@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const migration = fs.readFileSync(path.resolve(process.cwd(), 'backend/migrations/007_langgraph_checkpoint_schema.sql'), 'utf8');
 
 describe('LangGraph checkpoint schema migration', () => {
-  it.each(['checkpoint_migrations', 'checkpoints', 'checkpoint_blobs', 'checkpoint_writes'])('creates agent_memory.%s', (table) => {
+  it.each(['checkpoint_migrations', 'checkpoints', 'checkpoint_blobs', 'checkpoint_writes'])('creates agent_memory.%s', (table: any) => {
     expect(migration).toContain(`agent_memory.${table}`);
   });
 

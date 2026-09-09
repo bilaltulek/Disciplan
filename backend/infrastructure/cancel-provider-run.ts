@@ -7,4 +7,4 @@ const cancelProviderRun = async (providerRunId: any) => {
   return { attempted: true };
 };
 
-module.exports = { cancelProviderRun };
+export = { cancelProviderRun };

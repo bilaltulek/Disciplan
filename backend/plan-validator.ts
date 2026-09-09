@@ -48,4 +48,4 @@ const validatePlan = ({ tasks, assignment, profile, existingLoad = {}, today, co
   return issues;
 };
 
-module.exports = { validatePlan };
+export = { validatePlan };

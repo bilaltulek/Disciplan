@@ -360,7 +360,7 @@ function getEstimatedDuration(subject: any, complexity: any) {
   return options[Math.floor(options.length / 2)];
 }
 
-module.exports = {
+export = {
   taskTemplates,
   durationEstimates,
   detectSubject,

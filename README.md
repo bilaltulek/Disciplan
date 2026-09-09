@@ -1,6 +1,7 @@
 ﻿# Disciplan
 
 - Website: https://disciplan.vercel.app/
+- Development Preview (`development-2`): https://disciplan-git-development-2-bilaltulek0-6462s-projects.vercel.app/
 
 Disciplan helps students turn overwhelming assignments into clear, day-by-day plans so they can stay consistent, focused, and on track. It combines planning, execution, and progress tracking in one place. 📚
 
@@ -301,7 +302,7 @@ npm run migrate
 
 Routing behavior:
 
-- `/api/*` -> serverless Express handler (`api/index.js`)
+- `/api/*` -> serverless Express handler (`api/index.ts`)
 - non-API routes -> frontend `index.html` (SPA deep-link support)
 
 ## 🐳 Docker (local and portable)

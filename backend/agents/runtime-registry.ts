@@ -50,7 +50,7 @@ const getModelPricing = (model: string) => {
   return pricing;
 };
 
-module.exports = {
+export = {
   GRAPH_VERSION,
   PROMPT_BUNDLE_VERSION,
   PROMPT_BUNDLE_HASH,

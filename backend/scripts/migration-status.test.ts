@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import migrationStatus from './migration-status.js';
+import migrationStatus = require('./migration-status.js');
 
 const { MIGRATION_REQUIREMENTS, classifyMigrationState } = migrationStatus;
 

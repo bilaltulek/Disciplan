@@ -33,4 +33,4 @@ const validateFocusTopicCoverage = (input: any) => {
     : [];
 };
 
-module.exports = { getMissingFocusTopics, validateFocusTopicCoverage };
+export = { getMissingFocusTopics, validateFocusTopicCoverage };

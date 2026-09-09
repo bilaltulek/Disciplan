@@ -91,7 +91,7 @@ const createPlanFeedback = async ({ userId, assignmentId, feedbackType, comment 
   return result.rows[0] || null;
 };
 
-module.exports = {
+export = {
   createManualTask,
   createPlanFeedback,
   deleteAssignment,

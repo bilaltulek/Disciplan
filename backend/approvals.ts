@@ -99,4 +99,4 @@ const decideApproval = async ({ userId, approvalId, decision, proposalHash }: an
   }
 };
 
-module.exports = { decideApproval, getApprovalForUser, listApprovalsForUser };
+export = { decideApproval, getApprovalForUser, listApprovalsForUser };

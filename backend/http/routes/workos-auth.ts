@@ -109,7 +109,7 @@ const createWorkosAuthRouter = ({
   return router;
 };
 
-module.exports = {
+export = {
   OAUTH_STATE_COOKIE,
   authErrorRedirect,
   createWorkosAuthRouter,

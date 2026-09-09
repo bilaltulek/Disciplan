@@ -459,7 +459,7 @@ const markCheckpointCleaned = async (id: any) => db.query(
   [id],
 );
 
-module.exports = {
+export = {
   TERMINAL_STATUSES,
   createAssignmentAndRun,
   getRunForUser,

@@ -32,4 +32,4 @@ const createRateLimiter = ({ scope, limit, windowMs, key = (req: any) => req.use
 const authRateLimit = createRateLimiter({ scope: 'auth', limit: 10, windowMs: 15 * 60_000 });
 const agentRateLimit = createRateLimiter({ scope: 'agent_command', limit: 30, windowMs: 60 * 60_000 });
 
-module.exports = { agentRateLimit, authRateLimit, createRateLimiter, hashKey };
+export = { agentRateLimit, authRateLimit, createRateLimiter, hashKey };

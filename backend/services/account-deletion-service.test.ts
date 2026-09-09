@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
-const require = createRequire(import.meta.url);
 const { deleteAccount } = require('./account-deletion-service');
 
 describe('account deletion authentication', () => {

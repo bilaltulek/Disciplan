@@ -82,9 +82,9 @@ const MIGRATION_REQUIREMENTS = {
   ],
 };
 
-const classifyMigrationState = (availableObjects) => Object.fromEntries(
-  Object.entries(MIGRATION_REQUIREMENTS).map(([migration, requirements]) => {
-    const present = requirements.filter((requirement) => availableObjects.has(requirement));
+const classifyMigrationState = (availableObjects: any) => Object.fromEntries(
+  Object.entries(MIGRATION_REQUIREMENTS).map(([migration, requirements]: any) => {
+    const present = requirements.filter((requirement: any) => availableObjects.has(requirement));
     const state = present.length === 0
       ? 'missing'
       : present.length === requirements.length
@@ -94,12 +94,12 @@ const classifyMigrationState = (availableObjects) => Object.fromEntries(
       state,
       present: present.length,
       required: requirements.length,
-      missingObjects: requirements.filter((requirement) => !availableObjects.has(requirement)),
+      missingObjects: requirements.filter((requirement: any) => !availableObjects.has(requirement)),
     }];
   }),
 );
 
-const readAvailableObjects = async (client) => {
+const readAvailableObjects = async (client: any) => {
   const [tables, columns] = await Promise.all([
     client.query(
       `SELECT table_schema, table_name
@@ -114,12 +114,12 @@ const readAvailableObjects = async (client) => {
   ]);
 
   return new Set([
-    ...tables.rows.map((row) => `table:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}`),
-    ...columns.rows.map((row) => `column:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}.${row.column_name}`),
+    ...tables.rows.map((row: any) => `table:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}`),
+    ...columns.rows.map((row: any) => `column:${row.table_schema === 'public' ? '' : `${row.table_schema}.`}${row.table_name}.${row.column_name}`),
   ]);
 };
 
-const readMigrationLedger = async (client, availableObjects) => {
+const readMigrationLedger = async (client: any, availableObjects: any) => {
   if (!availableObjects.has('table:schema_migrations')) return null;
   const result = await client.query(
     'SELECT filename, applied_at FROM schema_migrations ORDER BY filename ASC',
@@ -127,7 +127,7 @@ const readMigrationLedger = async (client, availableObjects) => {
   return result.rows;
 };
 
-const inspectMigrationStatus = async (client) => {
+const inspectMigrationStatus = async (client: any) => {
   const availableObjects = await readAvailableObjects(client);
   return {
     ledger: await readMigrationLedger(client, availableObjects),
@@ -140,7 +140,7 @@ async function main() {
   try {
     const report = await inspectMigrationStatus(client);
     console.log(JSON.stringify(report, null, 2));
-    if (Object.values(report.inferred).some((migration) => migration.state === 'partial')) {
+    if (Object.values(report.inferred).some((migration: any) => migration.state === 'partial')) {
       console.error('Partial migration state detected. Use additive corrective migrations; do not rewrite applied SQL.');
       process.exitCode = 2;
     }
@@ -151,13 +151,13 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
+  main().catch((error: any) => {
     console.error(`Migration status check failed: ${error.message}`);
     process.exitCode = 1;
   });
 }
 
-module.exports = {
+export = {
   MIGRATION_REQUIREMENTS,
   classifyMigrationState,
   inspectMigrationStatus,

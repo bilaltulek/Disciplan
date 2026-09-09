@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
-const require = createRequire(import.meta.url);
 const { csrfProtection } = require('./csrf');
 
 const response = () => {
@@ -9,8 +7,8 @@ const response = () => {
   return {
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
-    getHeader: (name) => headers.get(name),
-    setHeader: (name, value) => headers.set(name, value),
+    getHeader: (name: any) => headers.get(name),
+    setHeader: (name: any, value: any) => headers.set(name, value),
     headers,
   };
 };

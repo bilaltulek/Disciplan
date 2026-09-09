@@ -69,4 +69,4 @@ const deleteMemory = async ({ userId, memoryId }: any) => {
   return Boolean(result.rows[0]);
 };
 
-module.exports = { ALLOWED_KEYS, confirmMemory, deleteMemory, listMemories, proposeMemory, validateMemory };
+export = { ALLOWED_KEYS, confirmMemory, deleteMemory, listMemories, proposeMemory, validateMemory };

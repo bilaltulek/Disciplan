@@ -1,13 +1,21 @@
+FROM node:24.19.0-alpine AS build
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.backend.json tsconfig.runtime.json ./
+COPY backend ./backend
+COPY shared ./shared
+RUN npm run build:backend
+
 FROM node:24.19.0-alpine AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
-
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-
-COPY backend ./backend
-COPY shared ./shared
+COPY --from=build /app/build/backend ./backend
+COPY --from=build /app/build/shared ./shared
 
 USER node
 EXPOSE 5000

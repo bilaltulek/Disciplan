@@ -35,6 +35,42 @@ export interface WorkosConfiguration {
   enabled: Record<AuthProvider, boolean>;
 }
 
+export interface EnvironmentConfiguration {
+  port: number;
+  readonly jwtSecret: string;
+  readonly geminiApiKey: string;
+  geminiModel: string;
+  geminiRouterModel: string;
+  geminiAgentModel: string;
+  geminiSearchModel: string;
+  aiBudgetMonthlyUsd: number;
+  aiBudgetHardStopUsd: number;
+  aiMaxOutputTokens: number;
+  aiThinkingBudget: number;
+  aiUserDailyRequestLimit: number;
+  aiAgentMaxIterations: number;
+  aiAgentMaxModelCalls: number;
+  aiAgentMaxToolCalls: number;
+  aiAgentMaxSearchCalls: number;
+  aiSearchMonthlyRequestLimit: number;
+  aiAgentRunMaxReservationUsd: number;
+  databaseUrl: string;
+  agentDatabaseUrl: string;
+  migrationDatabaseUrl: string;
+  agentRolloutMode: 'off' | 'shadow' | 'active';
+  agentRuntimeScope: 'standard' | 'preview';
+  executionRuntime: 'api' | 'trigger';
+  triggerProjectRef: string;
+  agentExecutionPolicy: any;
+  corsOrigins: string[];
+  agentWorkerEnabled: boolean;
+  agentWorkerPollMs: number;
+  agentWorkerMaxAttempts: number;
+  cookieSecure: boolean;
+  isProduction: boolean;
+  workos: WorkosConfiguration;
+}
+
 export interface PersistedOAuthState {
   provider: AuthProvider;
   intent: AuthIntent;

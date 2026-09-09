@@ -42,8 +42,8 @@ const allocateTasks = ({ descriptions, startDate, dueDate, profile, existingLoad
   const minimumSession = Math.min(15, normalized.preferredSessionMinutes);
   const taskLimit = Math.max(1, Math.min(descriptions.length, Math.floor(totalCapacity / minimumSession)));
   const selected = taskLimit === 1
-    ? [descriptions.at(-1)]
-    : [...descriptions.slice(0, taskLimit - 1), descriptions.at(-1)];
+    ? [descriptions[descriptions.length - 1]]
+    : [...descriptions.slice(0, taskLimit - 1), descriptions[descriptions.length - 1]];
   const mutableDays = days.map((day: any) => ({ ...day, remaining: day.capacityMinutes }));
 
   return selected.map((description) => {
@@ -59,7 +59,7 @@ const allocateTasks = ({ descriptions, startDate, dueDate, profile, existingLoad
   }).filter(Boolean);
 };
 
-module.exports = {
+export = {
   DEFAULT_PROFILE,
   allocateTasks,
   buildDailyCapacity,

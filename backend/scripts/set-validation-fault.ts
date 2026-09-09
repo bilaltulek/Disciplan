@@ -29,7 +29,7 @@ const main = async () => {
 };
 
 void main()
-  .catch((error) => {
+  .catch((error: any) => {
     process.stderr.write(`${error.code || 'VALIDATION_FAULT_FAILED'}\n`);
     process.exitCode = 1;
   })

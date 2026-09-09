@@ -112,7 +112,7 @@ const updateProfile = async ({ userId, name }: any, database: any = db) => {
   return result.rows[0] || null;
 };
 
-module.exports = {
+export = {
   createUser,
   defaultSettings,
   ensureUserSettings,

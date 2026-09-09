@@ -88,4 +88,4 @@ const deleteAccount = async ({
   }
 };
 
-module.exports = { deleteAccount };
+export = { deleteAccount };

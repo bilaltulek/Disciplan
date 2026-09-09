@@ -59,4 +59,4 @@ const dispatchRunBestEffort = async (runId: any) => {
   }
 };
 
-module.exports = { dispatchRunBestEffort };
+export = { dispatchRunBestEffort };

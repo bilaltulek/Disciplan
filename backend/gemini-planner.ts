@@ -38,4 +38,4 @@ const buildReviewPrompt = ({ assignment, tasks, validationIssues }: any) => {
   return `Review ONLY this structured plan data. Do not add user data or perform actions.\n\n${JSON.stringify(reviewInput)}`;
 };
 
-module.exports = { buildFallbackPlan, buildReviewPrompt };
+export = { buildFallbackPlan, buildReviewPrompt };

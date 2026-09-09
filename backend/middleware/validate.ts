@@ -185,7 +185,7 @@ const validateSettingsPatch = (req: any, res: any, next: any) => {
   return next();
 };
 
-module.exports = {
+export = {
   validateRegister,
   validateLogin,
   validateAssignment,

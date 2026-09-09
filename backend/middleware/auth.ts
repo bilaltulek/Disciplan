@@ -31,4 +31,4 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
-module.exports = { authenticateToken, parseCookies };
+export = { authenticateToken, parseCookies };

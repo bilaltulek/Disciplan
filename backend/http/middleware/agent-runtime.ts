@@ -25,4 +25,4 @@ const requireActiveAgentRuntime = (req: any, res: any, next: any) => {
   return next();
 };
 
-module.exports = { agentCapabilitiesForRequest, isAgentRuntimeActiveForRequest, requireActiveAgentRuntime };
+export = { agentCapabilitiesForRequest, isAgentRuntimeActiveForRequest, requireActiveAgentRuntime };

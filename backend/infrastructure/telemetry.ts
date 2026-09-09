@@ -30,4 +30,4 @@ const stopTelemetry = async () => {
 
 startTelemetry();
 
-module.exports = { startTelemetry, stopTelemetry };
+export = { startTelemetry, stopTelemetry };

@@ -33,7 +33,7 @@ const csrfProtection = (req: any, res: any, next: any) => {
   return next();
 };
 
-module.exports = {
+export = {
   CSRF_COOKIE,
   CSRF_HEADER,
   appendCookie,

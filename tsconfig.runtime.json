@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.backend.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./build",
+    "rootDir": ".",
+    "sourceMap": true
+  },
+  "include": [
+    "backend/**/*.ts",
+    "backend/**/*.d.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "frontend",
+    "backend/**/*.test.ts",
+    "backend/integration/**",
+    "backend/evals/**",
+    "backend/scripts/**"
+  ]
+}

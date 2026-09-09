@@ -43,7 +43,7 @@ const enumerateDates = (start: any, end: any) => {
   return Array.from({ length: last.ordinal - first.ordinal + 1 }, (_, index) => formatOrdinal(first.ordinal + index));
 };
 
-module.exports = {
+export = {
   DATE_ONLY_PATTERN,
   addDays,
   enumerateDates,

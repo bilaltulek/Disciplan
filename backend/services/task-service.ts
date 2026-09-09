@@ -80,4 +80,4 @@ const toggleTask = async ({ userId, taskId, completed }: any, database: any = db
   return result.rowCount || 0;
 };
 
-module.exports = { deleteTask, listHistory, listTimeline, toggleTask, updateTask };
+export = { deleteTask, listHistory, listTimeline, toggleTask, updateTask };

@@ -21,7 +21,7 @@ describe('public API behavioral baseline', () => {
     });
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('Validation failed');
-    expect(response.body.details.map((detail) => detail.field)).toEqual(['email', 'password', 'name']);
+    expect(response.body.details.map((detail: any) => detail.field)).toEqual(['email', 'password', 'name']);
   });
 
   it.each([
@@ -31,8 +31,8 @@ describe('public API behavioral baseline', () => {
     ['GET', '/api/timeline'],
     ['GET', '/api/history'],
     ['GET', '/api/agent-runs/00000000-0000-0000-0000-000000000000'],
-  ])('requires authentication for %s %s', async (method, path) => {
-    const response = await request(app)[method.toLowerCase()](path);
+  ])('requires authentication for %s %s', async (method: any, path: any) => {
+    const response = await (request(app) as any)[method.toLowerCase()](path);
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: 'Authentication required.' });
   });

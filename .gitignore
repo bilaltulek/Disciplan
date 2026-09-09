@@ -15,6 +15,7 @@ node_modules/
 .tmp/
 coverage/
 frontend/dist/
+build/
 test-results/
 playwright-report/
 *.log

@@ -1,9 +1,7 @@
 import express from 'express';
 import request from 'supertest';
-import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const require = createRequire(import.meta.url);
 const { createWorkosAuthRouter } = require('./workos-auth');
 
 const configured = {
@@ -14,12 +12,12 @@ const configured = {
   },
 };
 
-const createTestApp = (overrides = {}) => {
+const createTestApp = (overrides: any = {}) => {
   const service = {
     PROVIDERS: { google: {}, microsoft: {}, sso: {} },
     INTENTS: new Set(['login', 'signup']),
     providerCapabilities: vi.fn().mockReturnValue({ google: true, microsoft: false, sso: true }),
-    sanitizeReturnPath: vi.fn((path) => path === '/assistant' ? path : '/dashboard'),
+    sanitizeReturnPath: vi.fn((path: any) => path === '/assistant' ? path : '/dashboard'),
     createOAuthState: vi.fn().mockResolvedValue('state-token'),
     consumeOAuthState: vi.fn().mockResolvedValue({ provider: 'google', intent: 'login', return_path: '/dashboard' }),
     getAuthorizationUrl: vi.fn().mockReturnValue('https://example.workos.com/authorize'),
@@ -35,8 +33,8 @@ const createTestApp = (overrides = {}) => {
   app.use('/api/auth', createWorkosAuthRouter({
     config: overrides.config || configured,
     issueToken: vi.fn().mockReturnValue('local-jwt'),
-    setAuthCookie: (res, token) => res.append('Set-Cookie', `token=${token}; HttpOnly; Path=/`),
-    rateLimit: (_req, _res, next) => next(),
+    setAuthCookie: (res: any, token: any) => res.append('Set-Cookie', `token=${token}; HttpOnly; Path=/`),
+    rateLimit: (_req: any, _res: any, next: any) => next(),
     logger: { warn: vi.fn() },
     service,
   }));
@@ -85,8 +83,8 @@ describe('WorkOS auth routes', () => {
       .set('Cookie', 'disciplan_oauth_state=state-token');
     expect(response.status).toBe(302);
     expect(response.headers.location).toBe('/dashboard');
-    expect(response.headers['set-cookie'].join(';')).toContain('token=local-jwt');
-    expect(response.headers['set-cookie'].join(';')).toContain('disciplan_oauth_state=;');
+    expect(String(response.headers['set-cookie'])).toContain('token=local-jwt');
+    expect(String(response.headers['set-cookie'])).toContain('disciplan_oauth_state=;');
   });
 
   it('does not issue a session for provider mismatch or unresolved identity', async () => {

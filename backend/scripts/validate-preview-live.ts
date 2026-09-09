@@ -21,10 +21,15 @@ const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'disciplan-prev
 const cookieJar = path.join(temporaryDirectory, 'cookies.txt');
 const password = `Dv-${crypto.randomBytes(18).toString('base64url')}`;
 const email = `preview-validation-${crypto.randomUUID()}@example.invalid`;
-const summary = { capabilities: null, formRuns: [], conversationRuns: [], cleanup: false };
+const summary: {
+  capabilities: unknown;
+  formRuns: Record<string, unknown>[];
+  conversationRuns: Record<string, unknown>[];
+  cleanup: boolean;
+} = { capabilities: null, formRuns: [], conversationRuns: [], cleanup: false };
 let accountRegistered = false;
 
-const invokeVercelCurl = ({ method = 'GET', pathname, body, headers = {} }) => {
+const invokeVercelCurl = ({ method = 'GET', pathname, body, headers = {} }: any) => {
   const curlArgs = [
     'curl', pathname, '--deployment', normalizedDeployment, '--', '--silent', '--show-error',
     '--cookie', cookieJar, '--cookie-jar', cookieJar, '--request', method,
@@ -51,7 +56,7 @@ const invokeVercelCurl = ({ method = 'GET', pathname, body, headers = {} }) => {
   return { status, body: parsed };
 };
 
-const getCookie = (name) => {
+const getCookie = (name: any) => {
   if (!fs.existsSync(cookieJar)) return null;
   for (const line of fs.readFileSync(cookieJar, 'utf8').split(/\r?\n/)) {
     if (!line || line.startsWith('#')) continue;
@@ -61,15 +66,15 @@ const getCookie = (name) => {
   return null;
 };
 
-const request = ({ method = 'GET', pathname, body, idempotencyKey }) => {
-  const headers = {};
+const request = ({ method = 'GET', pathname, body, idempotencyKey }: any) => {
+  const headers: Record<string, string> = {};
   const csrf = getCookie('disciplan_csrf');
   if (csrf && !['GET', 'HEAD'].includes(method)) headers['X-CSRF-Token'] = csrf;
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   return invokeVercelCurl({ method, pathname, body, headers });
 };
 
-const requireStatus = (response, expected, label) => {
+const requireStatus = (response: any, expected: any, label: any) => {
   if (response.status !== expected) {
     const code = response.body?.code || response.body?.error || 'UNKNOWN_ERROR';
     throw new Error(`${label} returned ${response.status} (${code}).`);
@@ -78,24 +83,24 @@ const requireStatus = (response, expected, label) => {
 };
 
 const terminalStatuses = new Set(['succeeded', 'failed', 'cancelled']);
-const waitForRun = async (runId, { allowWaitingForInput = false, timeoutMs = 360_000 } = {}) => {
+const waitForRun = async (runId: any, { allowWaitingForInput = false, timeoutMs = 360_000 }: any = {}) => {
   const deadline = Date.now() + timeoutMs;
   let latest;
   while (Date.now() < deadline) {
     latest = requireStatus(request({ pathname: `/api/agent-runs/${runId}` }), 200, 'Run status').run;
     if (terminalStatuses.has(latest.status) || (allowWaitingForInput && latest.status === 'waiting_for_input')) return latest;
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    await new Promise((resolve: any) => setTimeout(resolve, 3_000));
   }
   throw new Error(`Run ${runId} did not reach the expected state (last: ${latest?.status || 'unknown'}).`);
 };
 
-const isoDateAfter = (days) => {
+const isoDateAfter = (days: any) => {
   const value = new Date();
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 };
 
-const safeRunDiagnostics = async (runId) => {
+const safeRunDiagnostics = async (runId: any) => {
   const [events, usage] = await Promise.all([
     pool.query('SELECT detail_code,safe_detail FROM agent_run_events WHERE run_id=$1 ORDER BY id', [runId]),
     pool.query(
@@ -106,33 +111,33 @@ const safeRunDiagnostics = async (runId) => {
   ]);
   return {
     runId,
-    events: events.rows.filter((row) => row.detail_code),
+    events: events.rows.filter((row: any) => row.detail_code),
     usage: usage.rows,
   };
 };
 
-const assertAgentic = async (run, label) => {
+const assertAgentic = async (run: any, label: any) => {
   if (run.status !== 'succeeded' || run.plan_source !== 'agentic') {
     const diagnostics = await safeRunDiagnostics(run.id);
     throw new Error(`${label} ended as ${run.status}/${run.plan_source || 'no-source'} (${run.failure_code || 'no code'}); safe diagnostics: ${JSON.stringify(diagnostics)}.`);
   }
 };
 
-const normalizedTaskText = (tasks) => tasks.map((task) => task.task_description).join(' ').toLowerCase();
-const requireTerms = (text, termGroups, label) => {
-  const missing = termGroups.filter((alternatives) => !alternatives.some((term) => text.includes(term)));
-  if (missing.length) throw new Error(`${label} omitted required topic groups: ${missing.map((terms) => terms[0]).join(', ')}.`);
+const normalizedTaskText = (tasks: any) => tasks.map((task: any) => task.task_description).join(' ').toLowerCase();
+const requireTerms = (text: any, termGroups: any, label: any) => {
+  const missing = termGroups.filter((alternatives: any) => !alternatives.some((term: any) => text.includes(term)));
+  if (missing.length) throw new Error(`${label} omitted required topic groups: ${missing.map((terms: any) => terms[0]).join(', ')}.`);
 };
 
-const requireNoWritingTemplate = (text, label) => {
+const requireNoWritingTemplate = (text: any, label: any) => {
   const forbidden = ['write first draft', 'proofread', 'submit assignment', 'create outline'];
-  const found = forbidden.filter((term) => text.includes(term));
+  const found = forbidden.filter((term: any) => text.includes(term));
   if (found.length) throw new Error(`${label} contained generic writing phases: ${found.join(', ')}.`);
 };
 
 const pool = new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 2 });
 
-const executionEvidence = async (runId) => {
+const executionEvidence = async (runId: any) => {
   const result = await pool.query(
     `SELECT r.id, r.status, r.plan_source, r.provider_run_id, r.model_provider, r.model_name,
             r.graph_version, r.prompt_bundle_version,
@@ -174,7 +179,7 @@ const executionEvidence = async (runId) => {
   };
 };
 
-const createFormPlan = async ({ title, description, totalItems, dueInDays, topicGroups }) => {
+const createFormPlan = async ({ title, description, totalItems, dueInDays, topicGroups }: any) => {
   const accepted = requireStatus(request({
     method: 'POST', pathname: '/api/assignments', idempotencyKey: crypto.randomUUID(),
     body: { title, description, complexity: 'Medium', dueDate: isoDateAfter(dueInDays), totalItems },
@@ -189,14 +194,14 @@ const createFormPlan = async ({ title, description, totalItems, dueInDays, topic
   summary.formRuns.push({ ...evidence, assignmentId: accepted.id, taskCount: tasks.length, topicCoverage: true });
 };
 
-const sendMessage = (threadId, content, replyToRunId) => requireStatus(request({
+const sendMessage = (threadId: any, content: any, replyToRunId?: any) => requireStatus(request({
   method: 'POST', pathname: `/api/agent-threads/${threadId}/messages`,
   idempotencyKey: crypto.randomUUID(), body: {
     content, clientMessageId: crypto.randomUUID(), ...(replyToRunId ? { replyToRunId } : {}),
   },
 }), 202, 'Assistant message');
 
-const assistantEvidence = async (threadId, run, expectedKind) => {
+const assistantEvidence = async (threadId: any, run: any, expectedKind: any) => {
   if (run.status !== 'succeeded' || run.plan_source !== 'agentic') {
     throw new Error(`Assistant ${expectedKind} ended as ${run.status}/${run.plan_source || 'no-source'}.`);
   }
@@ -220,9 +225,9 @@ const assistantEvidence = async (threadId, run, expectedKind) => {
   const eventCodes = (await pool.query(
     'SELECT detail_code FROM agent_run_events WHERE run_id=$1 AND detail_code IS NOT NULL ORDER BY id',
     [run.id],
-  )).rows.map((item) => item.detail_code);
+  )).rows.map((item: any) => item.detail_code);
   const thread = requireStatus(request({ pathname: `/api/agent-threads/${threadId}` }), 200, 'Assistant thread');
-  const message = [...thread.messages].reverse().find((item) => item.role === 'assistant' && item.content_metadata?.runId === run.id);
+  const message = [...thread.messages].reverse().find((item: any) => item.role === 'assistant' && item.content_metadata?.runId === run.id);
   if (!row?.provider_run_id || !row.graph_started || row.model_provider !== 'gemini'
       || row.usage_events < 1 || row.total_tokens < 1 || message?.content_metadata?.kind !== expectedKind) {
     throw new Error(`Assistant run ${run.id} did not prove Trigger/LangGraph/Gemini ${expectedKind} execution.`);
@@ -320,7 +325,7 @@ const run = async () => {
   const resumedRun = await waitForRun(resumed.run.id);
   await assertAgentic(resumedRun, 'Clarification-resumed Assistant plan');
   const clarificationEvents = requireStatus(request({ pathname: `/api/agent-runs/${resumedRun.id}/events` }), 200, 'Clarification events').events;
-  if (!clarificationEvents.some((event) => event.detail_code === 'CLARIFICATION_REQUIRED')) {
+  if (!clarificationEvents.some((event: any) => event.detail_code === 'CLARIFICATION_REQUIRED')) {
     throw new Error('Clarification run has no persisted CLARIFICATION_REQUIRED event.');
   }
   summary.conversationRuns.push({ kind: 'clarification_resume', clarificationPersisted: true, ...await executionEvidence(resumedRun.id) });
@@ -334,7 +339,7 @@ const run = async () => {
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 };
 
-run().catch((error) => {
+run().catch((error: any) => {
   process.stderr.write(`Preview validation failed: ${error.message}\n`);
   process.exitCode = 1;
 }).finally(async () => {

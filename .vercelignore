@@ -35,10 +35,10 @@ vitest.config.ts
 backend/**/*.test.*
 backend/integration/
 backend/evals/
-backend/scripts/deploy-preview-runtime.js
-backend/scripts/set-validation-fault.js
-backend/scripts/validate-preview-live.js
-backend/scripts/validation-accounts.js
+backend/scripts/deploy-preview-runtime.ts
+backend/scripts/set-validation-fault.ts
+backend/scripts/validate-preview-live.ts
+backend/scripts/validation-accounts.ts
 trigger/
 trigger.config.ts
 tsconfig.trigger.json

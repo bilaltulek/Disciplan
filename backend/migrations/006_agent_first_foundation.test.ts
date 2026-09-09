@@ -18,7 +18,7 @@ describe('006 agent-first foundation migration', () => {
     'plan_version_items',
     'agent_approvals',
     'user_planning_profiles',
-  ])('creates %s additively', (table) => {
+  ])('creates %s additively', (table: any) => {
     expect(migration).toMatch(new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`));
   });
 

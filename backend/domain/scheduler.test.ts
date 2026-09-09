@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
-const require = createRequire(import.meta.url);
 const { addDays, enumerateDates, parseDateOnly, todayInTimezone } = require('./date-only');
 const { allocateTasks, buildDailyCapacity } = require('./scheduler');
 

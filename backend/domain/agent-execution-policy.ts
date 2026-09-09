@@ -129,7 +129,7 @@ const createAgentExecutionPolicy = ({
   });
 };
 
-module.exports = {
+export = {
   assertMatchingValidationDatabases,
   assertPreviewRuntimeConfiguration,
   canonicalNeonDatabase,

@@ -28,4 +28,4 @@ const requestContext = pinoHttp({
   },
 });
 
-module.exports = { requestContext, safeRequestId };
+export = { requestContext, safeRequestId };

@@ -416,4 +416,4 @@ app.delete('/api/account', authenticateToken, agentRateLimit, withErrorBoundary(
   return res.json({ message: 'Account deleted.' });
 }));
 
-module.exports = app;
+export = app;

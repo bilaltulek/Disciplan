@@ -3,7 +3,7 @@ FROM node:24.19.0-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.backend.json tsconfig.worker.json ./
+COPY tsconfig.backend.json tsconfig.runtime.json tsconfig.worker.json ./
 COPY backend ./backend
 COPY shared ./shared
 RUN npx tsc -p tsconfig.worker.json
@@ -14,10 +14,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
-COPY backend ./backend
-COPY shared ./shared
-COPY --from=build /app/build/backend/agent-graph.js ./backend/agent-graph.js
-COPY --from=build /app/build/backend/agent-worker.js ./backend/agent-worker.js
+COPY --from=build /app/build/backend ./backend
+COPY --from=build /app/build/shared ./shared
 
 USER node
 CMD ["node", "backend/agent-worker.js"]

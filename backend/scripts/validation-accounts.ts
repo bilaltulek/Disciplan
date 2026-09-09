@@ -23,7 +23,7 @@ const requireIsolatedDatabase = () => {
   return connectionString;
 };
 
-const createAccounts = async (client) => {
+const createAccounts = async (client: any) => {
   const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
   const results = [];
   for (const [role, email] of Object.entries(ROLES)) {
@@ -46,7 +46,7 @@ const createAccounts = async (client) => {
   return results;
 };
 
-const deleteAccounts = async (client) => {
+const deleteAccounts = async (client: any) => {
   const result = await client.query(
     'DELETE FROM users WHERE email = ANY($1::text[]) RETURNING id',
     [Object.values(ROLES)],
@@ -54,7 +54,7 @@ const deleteAccounts = async (client) => {
   return result.rowCount;
 };
 
-const deleteAccountCheckpoints = async (client) => {
+const deleteAccountCheckpoints = async (client: any) => {
   let deleted = 0;
   for (const table of ['checkpoint_writes', 'checkpoint_blobs', 'checkpoints']) {
     const result = await client.query(
@@ -77,7 +77,7 @@ const deleteAccountCheckpoints = async (client) => {
 const main = async () => {
   const action = process.argv[2];
   if (!['create', 'delete'].includes(action)) {
-    throw new Error('Usage: node backend/scripts/validation-accounts.js <create|delete>');
+    throw new Error('Usage: tsx backend/scripts/validation-accounts.ts <create|delete>');
   }
   const pool = new Pool({ connectionString: requireIsolatedDatabase(), ssl: { rejectUnauthorized: true } });
   const client = await pool.connect();
@@ -103,12 +103,12 @@ const main = async () => {
 };
 
 if (require.main === module) {
-  main().catch((error) => {
+  main().catch((error: any) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
   });
 }
 
-module.exports = {
+export = {
   ROLES, createAccounts, deleteAccountCheckpoints, deleteAccounts, requireIsolatedDatabase,
 };

@@ -2,9 +2,10 @@
   "scripts": {
     "start:backend": "tsx backend/server.ts",
     "start:agent-worker": "tsx backend/agent-worker.ts",
-    "migrate": "node backend/scripts/migrate.js",
-    "migrations:status": "node backend/scripts/migration-status.js",
+    "migrate": "tsx backend/scripts/migrate.ts",
+    "migrations:status": "tsx backend/scripts/migration-status.ts",
     "check:backend": "tsc -p tsconfig.backend.json --noEmit",
+    "build:backend": "tsc -p tsconfig.runtime.json",
     "check:trigger": "tsc -p tsconfig.trigger.json --noEmit",
     "typecheck": "npm run check:backend && npm run check:trigger && npm --prefix frontend run typecheck",
     "test": "vitest run",
@@ -13,11 +14,11 @@
     "test:watch": "vitest",
     "test:integration": "cross-env RUN_DB_INTEGRATION=true vitest run backend/integration",
     "eval:agent": "tsx backend/evals/run-canary.ts",
-    "validation:set-fault": "node backend/scripts/set-validation-fault.js",
-    "validation:accounts:create": "node backend/scripts/validation-accounts.js create",
-    "validation:accounts:delete": "node backend/scripts/validation-accounts.js delete",
-    "deploy:preview-runtime": "node backend/scripts/deploy-preview-runtime.js",
-    "validate:preview-live": "node backend/scripts/validate-preview-live.js",
+    "validation:set-fault": "tsx backend/scripts/set-validation-fault.ts",
+    "validation:accounts:create": "tsx backend/scripts/validation-accounts.ts create",
+    "validation:accounts:delete": "tsx backend/scripts/validation-accounts.ts delete",
+    "deploy:preview-runtime": "tsx backend/scripts/deploy-preview-runtime.ts",
+    "validate:preview-live": "tsx backend/scripts/validate-preview-live.ts",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "test:e2e": "playwright test"
   },
@@ -66,6 +67,7 @@
     "testcontainers": "12.1.0",
     "tsx": "^4.23.8",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "vite": "6.4.3",
+    "vitest": "4.1.11"
   }
 }
