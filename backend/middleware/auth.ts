@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config.env');
 
-const parseCookies = (cookieHeader = '') => cookieHeader.split(';').reduce((acc, part) => {
+const parseCookies = (cookieHeader: any = '') => cookieHeader.split(';').reduce((acc: any, part: any) => {
   const [key, ...rest] = part.trim().split('=');
   if (!key) return acc;
   try {
@@ -12,7 +12,7 @@ const parseCookies = (cookieHeader = '') => cookieHeader.split(';').reduce((acc,
   return acc;
 }, {});
 
-const authenticateToken = (req, res, next) => {
+const authenticateToken = (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
   const cookies = parseCookies(req.headers.cookie || '');
@@ -22,7 +22,7 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication required.' });
   }
 
-  jwt.verify(token, config.jwtSecret, (err, user) => {
+  jwt.verify(token, config.jwtSecret, (err: any, user: any) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token.' });
     }

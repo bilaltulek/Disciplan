@@ -1,8 +1,11 @@
 const crypto = require('crypto');
 const { WorkOS } = require('@workos-inc/node');
 const db = require('../db');
+import type {
+  AuthIntent, AuthProvider, PersistedOAuthState, TransactionalDatabase, WorkosConfiguration,
+} from '../types.js';
 
-const PROVIDERS = Object.freeze({
+const PROVIDERS: Readonly<Record<AuthProvider, { workosProvider: string; authenticationMethod: string }>> = Object.freeze({
   google: { workosProvider: 'GoogleOAuth', authenticationMethod: 'GoogleOAuth' },
   microsoft: { workosProvider: 'MicrosoftOAuth', authenticationMethod: 'MicrosoftOAuth' },
   sso: { workosProvider: 'authkit', authenticationMethod: 'SSO' },
@@ -11,21 +14,22 @@ const INTENTS = new Set(['login', 'signup']);
 const SAFE_RETURN_PATHS = new Set(['/dashboard', '/timeline', '/history', '/assistant', '/settings', '/profile']);
 const STATE_TTL_MS = 10 * 60_000;
 
-const stateHash = (state) => crypto.createHash('sha256').update(state).digest('hex');
+const stateHash = (state: any) => crypto.createHash('sha256').update(state).digest('hex');
 
-const safeEqual = (left, right) => {
+const safeEqual = (left: any, right: any) => {
   if (typeof left !== 'string' || typeof right !== 'string') return false;
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 };
 
-const sanitizeReturnPath = (value) => (
+const sanitizeReturnPath = (value: any) => (
   typeof value === 'string' && SAFE_RETURN_PATHS.has(value) ? value : '/dashboard'
 );
 
-const providerCapabilities = (config) => {
-  const workos = config?.workos || {};
+const providerCapabilities = (config: { workos?: WorkosConfiguration }) => {
+  const workos = config.workos;
+  if (!workos) return { google: false, microsoft: false, sso: false };
   const configured = Boolean(workos.apiKey && workos.clientId && workos.redirectUri && workos.redirectUriValid);
   return {
     google: configured && workos.enabled?.google === true,
@@ -34,7 +38,10 @@ const providerCapabilities = (config) => {
   };
 };
 
-const createOAuthState = async ({ provider, intent, returnPath }, database = db) => {
+const createOAuthState = async (
+  { provider, intent, returnPath }: { provider: AuthProvider; intent: AuthIntent; returnPath?: string },
+  database: TransactionalDatabase = db,
+) => {
   if (!PROVIDERS[provider] || !INTENTS.has(intent)) throw new TypeError('Invalid OAuth state input.');
   const state = crypto.randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + STATE_TTL_MS);
@@ -47,7 +54,10 @@ const createOAuthState = async ({ provider, intent, returnPath }, database = db)
   return state;
 };
 
-const consumeOAuthState = async ({ cookieState, returnedState }, database = db) => {
+const consumeOAuthState = async (
+  { cookieState, returnedState }: { cookieState?: string; returnedState?: string },
+  database: TransactionalDatabase = db,
+): Promise<PersistedOAuthState | null> => {
   if (!safeEqual(cookieState, returnedState)) return null;
   const result = await database.query(
     `UPDATE auth_oauth_states SET consumed_at=CURRENT_TIMESTAMP
@@ -55,13 +65,15 @@ const consumeOAuthState = async ({ cookieState, returnedState }, database = db) 
      RETURNING provider,intent,return_path`,
     [stateHash(cookieState)],
   );
-  return result.rows[0] || null;
+  return (result.rows[0] as PersistedOAuthState | undefined) || null;
 };
 
-const createWorkosClient = (config) => new WorkOS(config.workos.apiKey, { clientId: config.workos.clientId });
+const createWorkosClient = (config: { workos: WorkosConfiguration }) => (
+  new WorkOS(config.workos.apiKey, { clientId: config.workos.clientId })
+);
 
-const getAuthorizationUrl = ({ config, provider, intent, state, client = createWorkosClient(config) }) => {
-  const providerConfig = PROVIDERS[provider];
+const getAuthorizationUrl = ({ config, provider, intent, state, client = createWorkosClient(config) }: any) => {
+  const providerConfig = PROVIDERS[provider as AuthProvider];
   if (!providerConfig || !INTENTS.has(intent)) throw new TypeError('Unsupported authentication request.');
   return client.userManagement.getAuthorizationUrl({
     clientId: config.workos.clientId,
@@ -73,7 +85,7 @@ const getAuthorizationUrl = ({ config, provider, intent, state, client = createW
   });
 };
 
-const exchangeAuthorizationCode = async ({ config, code, ipAddress, userAgent, client = createWorkosClient(config) }) => (
+const exchangeAuthorizationCode = async ({ config, code, ipAddress, userAgent, client = createWorkosClient(config) }: any) => (
   client.userManagement.authenticateWithCode({
     clientId: config.workos.clientId,
     code,
@@ -82,17 +94,17 @@ const exchangeAuthorizationCode = async ({ config, code, ipAddress, userAgent, c
   })
 );
 
-const authenticationMatchesProvider = (provider, method) => (
+const authenticationMatchesProvider = (provider: AuthProvider, method: string) => (
   Boolean(PROVIDERS[provider]) && PROVIDERS[provider].authenticationMethod === method
 );
 
-const workosDisplayName = (identity) => {
+const workosDisplayName = (identity: any) => {
   const assembled = [identity.firstName, identity.lastName].filter(Boolean).join(' ').trim();
   const name = (identity.name || assembled || identity.email.split('@')[0] || 'Student').trim();
   return name.slice(0, 100);
 };
 
-const resolveWorkosIdentity = async ({ identity, intent }, database = db) => {
+const resolveWorkosIdentity = async ({ identity, intent }: any, database: any = db) => {
   if (!identity?.id || !identity?.email || identity.emailVerified !== true) {
     return { status: 'unverified' };
   }
@@ -148,7 +160,7 @@ const resolveWorkosIdentity = async ({ identity, intent }, database = db) => {
     );
     await client.query('COMMIT');
     return { status: 'authenticated', user: created.rows[0] };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {

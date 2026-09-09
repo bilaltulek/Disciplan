@@ -8,7 +8,7 @@ const defaultSettings = Object.freeze({
   confirm_assignment_delete: true,
 });
 
-const normalizeSettings = (row) => ({
+const normalizeSettings = (row: any) => ({
   theme_mode: row?.theme_mode || defaultSettings.theme_mode,
   start_page: row?.start_page || defaultSettings.start_page,
   assignment_default_complexity: row?.assignment_default_complexity || defaultSettings.assignment_default_complexity,
@@ -18,7 +18,7 @@ const normalizeSettings = (row) => ({
     : !!row.confirm_assignment_delete,
 });
 
-const ensureUserSettings = async (userId, database = db) => {
+const ensureUserSettings = async (userId: any, database: any = db) => {
   await database.query(
     `INSERT INTO user_settings (
        user_id,theme_mode,start_page,assignment_default_complexity,
@@ -31,7 +31,7 @@ const ensureUserSettings = async (userId, database = db) => {
   );
 };
 
-const createUser = async ({ email, hashedPassword, name }, database = db) => {
+const createUser = async ({ email, hashedPassword, name }: any, database: any = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -43,7 +43,7 @@ const createUser = async ({ email, hashedPassword, name }, database = db) => {
     await ensureUserSettings(user.id, client);
     await client.query('COMMIT');
     return user;
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -51,17 +51,17 @@ const createUser = async ({ email, hashedPassword, name }, database = db) => {
   }
 };
 
-const findUserForLogin = async (email, database = db) => {
+const findUserForLogin = async (email: any, database: any = db) => {
   const result = await database.query('SELECT id,email,name,password FROM users WHERE email=$1', [email]);
   return result.rows[0] || null;
 };
 
-const getUser = async (userId, database = db) => {
+const getUser = async (userId: any, database: any = db) => {
   const result = await database.query('SELECT id,email,name FROM users WHERE id=$1', [userId]);
   return result.rows[0] || null;
 };
 
-const getSettings = async (userId, database = db) => {
+const getSettings = async (userId: any, database: any = db) => {
   await ensureUserSettings(userId, database);
   const result = await database.query(
     `SELECT theme_mode,start_page,assignment_default_complexity,
@@ -72,7 +72,7 @@ const getSettings = async (userId, database = db) => {
   return normalizeSettings(result.rows[0]);
 };
 
-const updateSettings = async ({ userId, patch }, database = db) => {
+const updateSettings = async ({ userId, patch }: any, database: any = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -85,7 +85,7 @@ const updateSettings = async ({ userId, patch }, database = db) => {
     );
     const merged = {
       ...normalizeSettings(current.rows[0]),
-      ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+      ...Object.fromEntries(Object.entries(patch).filter(([, value]: any) => value !== undefined)),
     };
     await client.query(
       `UPDATE user_settings SET theme_mode=$1,start_page=$2,
@@ -96,7 +96,7 @@ const updateSettings = async ({ userId, patch }, database = db) => {
     );
     await client.query('COMMIT');
     return merged;
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -104,7 +104,7 @@ const updateSettings = async ({ userId, patch }, database = db) => {
   }
 };
 
-const updateProfile = async ({ userId, name }, database = db) => {
+const updateProfile = async ({ userId, name }: any, database: any = db) => {
   const result = await database.query(
     'UPDATE users SET name=$1 WHERE id=$2 RETURNING id,email,name',
     [name, userId],

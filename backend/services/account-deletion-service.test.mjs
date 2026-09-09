@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { deleteAccount } = require('./account-deletion-service.js');
+const { deleteAccount } = require('./account-deletion-service');
 
 describe('account deletion authentication', () => {
   it('fails safely without invoking bcrypt for provider-only accounts', async () => {

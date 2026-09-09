@@ -2,12 +2,12 @@ const complexityValues = ['Easy', 'Medium', 'Hard'];
 const themeModeValues = ['light', 'dark', 'system'];
 const startPageValues = ['dashboard', 'timeline', 'history'];
 
-const validateEmail = (email) => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-const validatePassword = (password) => typeof password === 'string' && password.length >= 8 && password.length <= 72;
+const validateEmail = (email: any) => typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const validatePassword = (password: any) => typeof password === 'string' && password.length >= 8 && password.length <= 72;
 
-const badRequest = (res, details) => res.status(400).json({ error: 'Validation failed', details });
+const badRequest = (res: any, details: any) => res.status(400).json({ error: 'Validation failed', details });
 
-const validateRegister = (req, res, next) => {
+const validateRegister = (req: any, res: any, next: any) => {
   const { email, password, name } = req.body || {};
   const details = [];
   if (!validateEmail(email)) details.push({ field: 'email', message: 'Invalid email format.' });
@@ -18,7 +18,7 @@ const validateRegister = (req, res, next) => {
   return next();
 };
 
-const validateLogin = (req, res, next) => {
+const validateLogin = (req: any, res: any, next: any) => {
   const { email, password } = req.body || {};
   const details = [];
   if (!validateEmail(email)) details.push({ field: 'email', message: 'Invalid email format.' });
@@ -28,7 +28,7 @@ const validateLogin = (req, res, next) => {
   return next();
 };
 
-const validateAssignment = (req, res, next) => {
+const validateAssignment = (req: any, res: any, next: any) => {
   const {
     title, description, complexity, dueDate, totalItems,
   } = req.body || {};
@@ -54,7 +54,7 @@ const validateAssignment = (req, res, next) => {
   return next();
 };
 
-const validateIdParam = (req, res, next) => {
+const validateIdParam = (req: any, res: any, next: any) => {
   const id = Number.parseInt(req.params.id, 10);
   if (!Number.isInteger(id) || id <= 0) {
     return badRequest(res, [{ field: 'id', message: 'id must be a positive integer.' }]);
@@ -63,14 +63,14 @@ const validateIdParam = (req, res, next) => {
   return next();
 };
 
-const validateTaskToggle = (req, res, next) => {
+const validateTaskToggle = (req: any, res: any, next: any) => {
   if (typeof req.body?.completed !== 'boolean') {
     return badRequest(res, [{ field: 'completed', message: 'completed must be boolean.' }]);
   }
   return next();
 };
 
-const validateTaskUpdate = (req, res, next) => {
+const validateTaskUpdate = (req: any, res: any, next: any) => {
   const {
     task_description, scheduled_date, estimated_minutes, actual_minutes, completed,
   } = req.body || {};
@@ -129,7 +129,7 @@ const validateTaskUpdate = (req, res, next) => {
   return next();
 };
 
-const validateSettingsPatch = (req, res, next) => {
+const validateSettingsPatch = (req: any, res: any, next: any) => {
   const {
     theme_mode,
     start_page,

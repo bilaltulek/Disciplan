@@ -6,7 +6,7 @@ const deleteAccount = async ({
   password,
   verifyPassword,
   cancelProviderRun,
-}, database = db) => {
+}: any, database: any = db) => {
   const cancellationClient = await database.connect();
   let runsToCancel = [];
   try {
@@ -39,11 +39,11 @@ const deleteAccount = async ({
         `UPDATE agent_runs SET status='cancelled',cancellation_requested_at=CURRENT_TIMESTAMP,
            updated_at=CURRENT_TIMESTAMP
          WHERE id::text=ANY($1::text[]) AND status NOT IN ('succeeded','failed','cancelled')`,
-        [runsToCancel.map((row) => row.id)],
+        [runsToCancel.map((row: any) => row.id)],
       );
     }
     await cancellationClient.query('COMMIT');
-  } catch (error) {
+  } catch (error: any) {
     await cancellationClient.query('ROLLBACK');
     throw error;
   } finally {
@@ -53,7 +53,7 @@ const deleteAccount = async ({
   for (const run of runsToCancel) {
     try {
       await cancelProviderRun(run.provider_run_id);
-    } catch (error) {
+    } catch (error: any) {
       logger.warn({ err: error, runId: run.id },
         'Provider cancellation failed during account deletion; canonical cancellation remains authoritative');
     }
@@ -66,7 +66,7 @@ const deleteAccount = async ({
       'SELECT id::text FROM agent_runs WHERE user_id=$1 FOR UPDATE',
       [userId],
     );
-    const ids = runIds.rows.map((row) => row.id);
+    const ids = runIds.rows.map((row: any) => row.id);
     if (ids.length) {
       await deletionClient.query(
         `UPDATE agent_runs SET status='cancelled',cancellation_requested_at=CURRENT_TIMESTAMP
@@ -80,7 +80,7 @@ const deleteAccount = async ({
     const deleted = await deletionClient.query('DELETE FROM users WHERE id=$1 RETURNING id', [userId]);
     await deletionClient.query('COMMIT');
     return { verified: true, deleted: deleted.rowCount > 0 };
-  } catch (error) {
+  } catch (error: any) {
     await deletionClient.query('ROLLBACK');
     throw error;
   } finally {

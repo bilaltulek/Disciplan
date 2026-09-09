@@ -13,6 +13,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["backend/**/*.ts", "api/**/*.ts", "shared/**/*.ts"],
+  "include": ["backend/**/*.ts", "backend/**/*.d.ts", "api/**/*.ts", "shared/**/*.ts"],
   "exclude": ["node_modules", "frontend"]
 }

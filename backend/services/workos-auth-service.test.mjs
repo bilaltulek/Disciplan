@@ -11,7 +11,7 @@ const {
   resolveWorkosIdentity,
   sanitizeReturnPath,
   stateHash,
-} = require('./workos-auth-service.js');
+} = require('./workos-auth-service');
 
 describe('WorkOS authentication service', () => {
   it('reports only fully configured and individually enabled providers', () => {

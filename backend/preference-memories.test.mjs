@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { validateMemory } = require('./preference-memories.js');
+const { validateMemory } = require('./preference-memories');
 
 describe('preference memory validation', () => {
   it('accepts only bounded, explainable memory keys', () => {

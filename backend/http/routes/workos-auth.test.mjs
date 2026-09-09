@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { createWorkosAuthRouter } = require('./workos-auth.js');
+const { createWorkosAuthRouter } = require('./workos-auth');
 
 const configured = {
   cookieSecure: true,

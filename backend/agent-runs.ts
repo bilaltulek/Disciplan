@@ -7,13 +7,13 @@ const { validatePlan } = require('./plan-validator');
 
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
-const mapRun = (row) => row && ({
+const mapRun = (row: any) => row && ({
   ...row,
   attempt_count: Number(row.attempt_count ?? row.attempt_number ?? 0),
   runtime_kind: row.runtime_kind || 'legacy',
 });
 
-const requestHash = (assignment) => crypto.createHash('sha256').update(JSON.stringify({
+const requestHash = (assignment: any) => crypto.createHash('sha256').update(JSON.stringify({
   complexity: assignment.complexity,
   description: assignment.description || '',
   dueDate: assignment.dueDate,
@@ -21,7 +21,7 @@ const requestHash = (assignment) => crypto.createHash('sha256').update(JSON.stri
   totalItems: assignment.totalItems,
 })).digest('hex');
 
-const findIdempotentAssignmentRun = async ({ userId, idempotencyKey, assignment, error }) => {
+const findIdempotentAssignmentRun = async ({ userId, idempotencyKey, assignment, error }: any) => {
   if (error?.code !== '23505') throw error;
   const existing = await db.query(
     `SELECT r.*, 'agent_first'::text AS runtime_kind, row_to_json(a) AS assignment FROM agent_runs r
@@ -39,7 +39,7 @@ const findIdempotentAssignmentRun = async ({ userId, idempotencyKey, assignment,
   return { assignment: row.assignment, run: mapRun(row), duplicate: true };
 };
 
-const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idempotencyKey, effectiveMode = 'off' }) => {
+const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idempotencyKey, effectiveMode = 'off' }: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -62,7 +62,7 @@ const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idemp
       [userId, savedAssignment.id],
     );
     const profile = profileResult.rows[0] || null;
-    const existingLoad = Object.fromEntries(loadResult.rows.map((row) => [row.scheduled_date, Number(row.minutes)]));
+    const existingLoad = Object.fromEntries(loadResult.rows.map((row: any) => [row.scheduled_date, Number(row.minutes)]));
     const tasks = planner.buildFallbackPlan({
       ...assignment, planningProfile: profile, existingLoad,
     });
@@ -82,10 +82,10 @@ const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idemp
        RETURNING *, 'agent_first'::text AS runtime_kind`,
       [runId, savedAssignment.id, userId, idempotencyKey, requestHash(assignment), JSON.stringify({ rolloutMode: effectiveMode }), GRAPH_VERSION, PROMPT_BUNDLE_VERSION],
     );
-    const normalizedTasks = tasks.map((task) => ({
+    const normalizedTasks = tasks.map((task: any) => ({
       ...task, logicalTaskId: crypto.randomUUID(),
     }));
-    const proposalHash = crypto.createHash('sha256').update(JSON.stringify(normalizedTasks.map((task) => ({
+    const proposalHash = crypto.createHash('sha256').update(JSON.stringify(normalizedTasks.map((task: any) => ({
       task_description: task.task_description,
       scheduled_date: task.scheduled_date,
       estimated_minutes: task.estimated_minutes,
@@ -133,7 +133,7 @@ const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idemp
     }
     await client.query('COMMIT');
     return { assignment: savedAssignment, run: mapRun(runResult.rows[0]), duplicate: false };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     return findIdempotentAssignmentRun({ userId, idempotencyKey, assignment, error });
   } finally {
@@ -141,7 +141,7 @@ const createAssignmentWithDeterministicPlan = async ({ userId, assignment, idemp
   }
 };
 
-const createAssignmentAndRun = async ({ userId, assignment, idempotencyKey }) => {
+const createAssignmentAndRun = async ({ userId, assignment, idempotencyKey }: any) => {
   const effectiveMode = config.agentExecutionPolicy.effectiveModeForUser(userId);
   if (effectiveMode !== 'active') {
     return createAssignmentWithDeterministicPlan({ userId, assignment, idempotencyKey, effectiveMode });
@@ -177,7 +177,7 @@ const createAssignmentAndRun = async ({ userId, assignment, idempotencyKey }) =>
     );
     await client.query('COMMIT');
     return { assignment: assignmentResult.rows[0], run: mapRun(runResult.rows[0]), duplicate: false };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     return findIdempotentAssignmentRun({ userId, idempotencyKey, assignment, error });
   } finally {
@@ -185,7 +185,7 @@ const createAssignmentAndRun = async ({ userId, assignment, idempotencyKey }) =>
   }
 };
 
-const getRunForUser = async (runId, userId) => {
+const getRunForUser = async (runId: any, userId: any) => {
   const generic = await db.query(
     `SELECT *, 'agent_first'::text AS runtime_kind FROM agent_runs WHERE id = $1 AND user_id = $2`,
     [runId, userId],
@@ -195,7 +195,7 @@ const getRunForUser = async (runId, userId) => {
   return mapRun(legacy.rows[0]);
 };
 
-const getRunEventsForUser = async ({ runId, userId, afterId = 0, limit = 100 }) => {
+const getRunEventsForUser = async ({ runId, userId, afterId = 0, limit = 100 }: any) => {
   const owned = await db.query('SELECT 1 FROM agent_runs WHERE id = $1 AND user_id = $2', [runId, userId]);
   if (!owned.rowCount) return null;
   const result = await db.query(
@@ -207,7 +207,7 @@ const getRunEventsForUser = async ({ runId, userId, afterId = 0, limit = 100 }) 
   return result.rows;
 };
 
-const setRunState = async ({ runId, status, step, detail, failureCode = null, failureMessage = null, planSource = null }) => {
+const setRunState = async ({ runId, status, step, detail, failureCode = null, failureMessage = null, planSource = null }: any) => {
   const result = await db.query(
     `UPDATE plan_generation_runs
      SET status = $2, current_step = $3, failure_code = $4, failure_message = $5,
@@ -226,7 +226,7 @@ const setRunState = async ({ runId, status, step, detail, failureCode = null, fa
   return mapRun(result.rows[0]);
 };
 
-const claimRun = async (runId) => {
+const claimRun = async (runId: any) => {
   const result = await db.query(
     `UPDATE plan_generation_runs
      SET status = 'running', current_step = 'intake', attempt_count = attempt_count + 1, updated_at = CURRENT_TIMESTAMP
@@ -237,7 +237,7 @@ const claimRun = async (runId) => {
   return mapRun(result.rows[0]);
 };
 
-const getPlanningContext = async (runId) => {
+const getPlanningContext = async (runId: any) => {
   const result = await db.query(
     `SELECT r.*, a.title, a.description, a.complexity, a.due_date, a.total_items
      FROM plan_generation_runs r JOIN assignments a ON a.id = r.assignment_id
@@ -247,7 +247,7 @@ const getPlanningContext = async (runId) => {
   return result.rows[0] || null;
 };
 
-const publishTasks = async ({ runId, tasks, source }) => {
+const publishTasks = async ({ runId, tasks, source }: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -280,7 +280,7 @@ const publishTasks = async ({ runId, tasks, source }) => {
     );
     await client.query('COMMIT');
     return true;
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -288,7 +288,7 @@ const publishTasks = async ({ runId, tasks, source }) => {
   }
 };
 
-const cancelRunForUser = async (runId, userId) => {
+const cancelRunForUser = async (runId: any, userId: any) => {
   const genericResult = await db.query(
     `UPDATE agent_runs SET status = 'cancelled', current_step = 'cancelled',
        cancellation_requested_at = CURRENT_TIMESTAMP, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -323,7 +323,7 @@ const cancelRunForUser = async (runId, userId) => {
   return run;
 };
 
-const retryRunForUser = async (runId, userId) => {
+const retryRunForUser = async (runId: any, userId: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -361,7 +361,7 @@ const retryRunForUser = async (runId, userId) => {
       return mapRun(run);
     }
     await client.query('ROLLBACK');
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -376,7 +376,7 @@ const retryRunForUser = async (runId, userId) => {
   return mapRun(result.rows[0]);
 };
 
-const enqueueExistingRun = async (run) => {
+const enqueueExistingRun = async (run: any) => {
   if (run.runtime_kind === 'agent_first') {
     await db.query(
       `INSERT INTO agent_dispatch_outbox (id, run_id, task_type)
@@ -393,7 +393,7 @@ const enqueueExistingRun = async (run) => {
   );
 };
 
-const claimPendingAgentJobs = async ({ workerId, limit = 1 } = {}) => {
+const claimPendingAgentJobs = async ({ workerId, limit = 1 }: any = {}) => {
   const leaseToken = crypto.randomUUID();
   const result = await db.query(
     `WITH candidates AS (
@@ -419,7 +419,7 @@ const claimPendingAgentJobs = async ({ workerId, limit = 1 } = {}) => {
   return { leaseToken, rows: result.rows };
 };
 
-const completeAgentJob = async (id, leaseToken) => db.query(
+const completeAgentJob = async (id: any, leaseToken: any) => db.query(
   `UPDATE agent_run_jobs
    SET completed_at = CURRENT_TIMESTAMP, lease_expires_at = NULL, lease_token = NULL,
        worker_id = NULL, last_error = NULL,
@@ -428,7 +428,7 @@ const completeAgentJob = async (id, leaseToken) => db.query(
   [id, leaseToken],
 );
 
-const failAgentJob = async (id, leaseToken, error, permanent = false) => db.query(
+const failAgentJob = async (id: any, leaseToken: any, error: any, permanent: any = false) => db.query(
   `UPDATE agent_run_jobs
    SET completed_at = CASE WHEN $4 THEN CURRENT_TIMESTAMP ELSE completed_at END,
        checkpoint_cleanup_after = CASE WHEN $4 THEN CURRENT_TIMESTAMP + INTERVAL '7 days' ELSE checkpoint_cleanup_after END,
@@ -439,7 +439,7 @@ const failAgentJob = async (id, leaseToken, error, permanent = false) => db.quer
   [id, leaseToken, String(error.message || error).slice(0, 500), permanent],
 );
 
-const listExpiredCheckpointCleanup = async (limit = 25) => {
+const listExpiredCheckpointCleanup = async (limit: any = 25) => {
   const result = await db.query(
     `SELECT id, payload
      FROM agent_run_jobs
@@ -453,7 +453,7 @@ const listExpiredCheckpointCleanup = async (limit = 25) => {
   return result.rows;
 };
 
-const markCheckpointCleaned = async (id) => db.query(
+const markCheckpointCleaned = async (id: any) => db.query(
   `UPDATE agent_run_jobs SET checkpoint_cleaned_at = CURRENT_TIMESTAMP
    WHERE id = $1 AND checkpoint_cleaned_at IS NULL`,
   [id],

@@ -10,7 +10,7 @@ const defaultPlanningProfile = () => ({
   preferred_session_minutes: 45,
 });
 
-const isTimezone = (value) => {
+const isTimezone = (value: any) => {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
     return true;
@@ -19,7 +19,7 @@ const isTimezone = (value) => {
   }
 };
 
-const validatePlanningProfile = (input) => {
+const validatePlanningProfile = (input: any) => {
   const issues = [];
   if (typeof input?.timezone !== 'string' || !isTimezone(input.timezone)) issues.push('timezone');
   if (!Number.isInteger(input?.max_daily_minutes) || input.max_daily_minutes < 1 || input.max_daily_minutes > 1440) issues.push('max_daily_minutes');
@@ -29,13 +29,13 @@ const validatePlanningProfile = (input) => {
   }
   const availability = input?.weekday_available_minutes;
   if (!availability || typeof availability !== 'object'
-      || !Array.from({ length: 7 }, (_, day) => day).every((day) => Number.isInteger(availability[day]) && availability[day] >= 0 && availability[day] <= 1440)) {
+      || !Array.from({ length: 7 }, (_: any, day: any) => day).every((day: any) => Number.isInteger(availability[day]) && availability[day] >= 0 && availability[day] <= 1440)) {
     issues.push('weekday_available_minutes');
   }
   return issues;
 };
 
-const getPlanningProfile = async (userId) => {
+const getPlanningProfile = async (userId: any) => {
   const result = await db.query(
     `SELECT version, timezone, weekday_available_minutes, max_daily_minutes, preferred_session_minutes
      FROM user_planning_profiles WHERE user_id = $1`,
@@ -44,7 +44,7 @@ const getPlanningProfile = async (userId) => {
   return result.rows[0] || defaultPlanningProfile();
 };
 
-const updatePlanningProfile = async ({ userId, expectedVersion, profile }) => {
+const updatePlanningProfile = async ({ userId, expectedVersion, profile }: any) => {
   const issues = validatePlanningProfile(profile);
   if (issues.length) return { issues };
   const result = await db.query(

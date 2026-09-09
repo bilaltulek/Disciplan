@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { csrfProtection } = require('./csrf.js');
+const { csrfProtection } = require('./csrf');
 
 const response = () => {
   const headers = new Map();

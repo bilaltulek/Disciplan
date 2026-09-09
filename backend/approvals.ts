@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const db = require('./db');
 
-const listApprovalsForUser = async ({ userId, status = 'pending', limit = 50 }) => {
+const listApprovalsForUser = async ({ userId, status = 'pending', limit = 50 }: any) => {
   const result = await db.query(
     `SELECT ap.*, a.title AS assignment_title, pv.rationale, pv.version_number
      FROM agent_approvals ap
@@ -14,7 +14,7 @@ const listApprovalsForUser = async ({ userId, status = 'pending', limit = 50 }) 
   return result.rows;
 };
 
-const getApprovalForUser = async ({ userId, approvalId }) => {
+const getApprovalForUser = async ({ userId, approvalId }: any) => {
   const approval = await db.query(
     `SELECT ap.*, a.title AS assignment_title, pv.rationale, pv.assumptions,
             pv.version_number, pv.parent_plan_version_id
@@ -33,7 +33,7 @@ const getApprovalForUser = async ({ userId, approvalId }) => {
   return { approval: approval.rows[0], items: items.rows };
 };
 
-const decideApproval = async ({ userId, approvalId, decision, proposalHash }) => {
+const decideApproval = async ({ userId, approvalId, decision, proposalHash }: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -91,7 +91,7 @@ const decideApproval = async ({ userId, approvalId, decision, proposalHash }) =>
     );
     await client.query('COMMIT');
     return { approval: updated.rows[0], duplicate: false };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {

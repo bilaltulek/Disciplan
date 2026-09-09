@@ -8,14 +8,14 @@ const OAUTH_STATE_MAX_AGE_SECONDS = 600;
 const allowedProviders = new Set(Object.keys(authService.PROVIDERS));
 const allowedIntents = new Set(authService.INTENTS);
 
-const authPageForIntent = (intent) => (intent === 'signup' ? '/signup' : '/login');
-const authErrorRedirect = (intent, code) => `${authPageForIntent(intent)}?auth_error=${encodeURIComponent(code)}`;
+const authPageForIntent = (intent: any) => (intent === 'signup' ? '/signup' : '/login');
+const authErrorRedirect = (intent: any, code: any) => `${authPageForIntent(intent)}?auth_error=${encodeURIComponent(code)}`;
 
-const setStateCookie = (res, state, secure) => {
+const setStateCookie = (res: any, state: any, secure: any) => {
   appendCookie(res, `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=${OAUTH_STATE_MAX_AGE_SECONDS};${secure ? ' Secure;' : ''}`);
 };
 
-const clearStateCookie = (res, secure) => {
+const clearStateCookie = (res: any, secure: any) => {
   appendCookie(res, `${OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/api/auth; Max-Age=0;${secure ? ' Secure;' : ''}`);
 };
 
@@ -26,12 +26,12 @@ const createWorkosAuthRouter = ({
   rateLimit,
   logger,
   service = authService,
-}) => {
+}: any) => {
   const router = express.Router();
 
-  router.get('/providers', (_req, res) => res.json(service.providerCapabilities(config)));
+  router.get('/providers', (_req: any, res: any) => res.json(service.providerCapabilities(config)));
 
-  router.get('/callback', rateLimit, async (req, res) => {
+  router.get('/callback', rateLimit, async (req: any, res: any) => {
     const cookies = parseCookies(req.headers.cookie || '');
     const cookieState = cookies[OAUTH_STATE_COOKIE];
     const returnedState = typeof req.query.state === 'string' ? req.query.state : '';
@@ -64,7 +64,7 @@ const createWorkosAuthRouter = ({
       }
       const resolved = await service.resolveWorkosIdentity({ identity: authenticated.user, intent: state.intent });
       if (resolved.status !== 'authenticated') {
-        const errorByStatus = {
+        const errorByStatus: Record<string, string> = {
           unverified: 'email_unverified',
           not_found: 'account_not_found',
           account_link_required: 'account_link_required',
@@ -75,7 +75,7 @@ const createWorkosAuthRouter = ({
 
       setAuthCookie(res, issueToken(resolved.user.id));
       return res.redirect(302, service.sanitizeReturnPath(state.return_path));
-    } catch (error) {
+    } catch (error: any) {
       logger.warn({
         requestId: req.id,
         reason: 'workos_callback_failed',
@@ -85,7 +85,7 @@ const createWorkosAuthRouter = ({
     }
   });
 
-  router.get('/:provider/start', (req, res, next) => {
+  router.get('/:provider/start', (req: any, res: any, next: any) => {
     const provider = String(req.params.provider || '').toLowerCase();
     const intent = typeof req.query.intent === 'string' ? req.query.intent : '';
     const capabilities = service.providerCapabilities(config);
@@ -94,14 +94,14 @@ const createWorkosAuthRouter = ({
     if (!allowedIntents.has(intent)) return res.status(400).json({ error: 'A valid authentication intent is required.' });
     req.workosAuth = { provider, intent, returnPath: service.sanitizeReturnPath(req.query.returnTo) };
     return next();
-  }, rateLimit, async (req, res, next) => {
+  }, rateLimit, async (req: any, res: any, next: any) => {
     try {
       const { provider, intent, returnPath } = req.workosAuth;
       const state = await service.createOAuthState({ provider, intent, returnPath });
       setStateCookie(res, state, config.cookieSecure);
       const authorizationUrl = service.getAuthorizationUrl({ config, provider, intent, state });
       return res.redirect(302, authorizationUrl);
-    } catch (error) {
+    } catch (error: any) {
       return next(error);
     }
   });

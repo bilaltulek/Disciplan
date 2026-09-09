@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { defaultPlanningProfile, isTimezone, validatePlanningProfile } = require('./planning-profiles.js');
+const { defaultPlanningProfile, isTimezone, validatePlanningProfile } = require('./planning-profiles');
 
 describe('planning profiles', () => {
   it('validates IANA timezones', () => {

@@ -10,8 +10,8 @@ import { ShadowPlanningService } from '../backend/services/shadow-planning.js';
 import { runPreviewSmoke } from './preview-smoke.js';
 import { assertDevelopmentValidationEnvironment, assertRunAllowed } from './validation-guard.js';
 
-const config = require('../backend/config.env.js');
-const db = require('../backend/worker-db.js') as Pool;
+const config = require('../backend/config.env');
+const db = require('../backend/worker-db') as Pool;
 
 const AgentRunPayload = z.object({ runId: z.string().uuid() });
 

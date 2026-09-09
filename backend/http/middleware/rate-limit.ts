@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const db = require('../../db');
 const config = require('../../config.env');
 
-const hashKey = (value) => crypto.createHmac('sha256', config.jwtSecret).update(String(value)).digest('hex');
+const hashKey = (value: any) => crypto.createHmac('sha256', config.jwtSecret).update(String(value)).digest('hex');
 
-const createRateLimiter = ({ scope, limit, windowMs, key = (req) => req.user?.id || req.ip }) => async (req, res, next) => {
+const createRateLimiter = ({ scope, limit, windowMs, key = (req: any) => req.user?.id || req.ip }: any) => async (req: any, res: any, next: any) => {
   try {
     const rawKey = key(req);
     if (!rawKey) return res.status(400).json({ error: 'Unable to identify request source.', code: 'RATE_LIMIT_KEY_MISSING' });
@@ -24,7 +24,7 @@ const createRateLimiter = ({ scope, limit, windowMs, key = (req) => req.user?.id
     res.setHeader('RateLimit-Reset', String(Math.ceil((bucketMs + windowMs) / 1000)));
     if (count > limit) return res.status(429).json({ error: 'Too many requests. Try again later.', code: 'RATE_LIMITED' });
     return next();
-  } catch (error) {
+  } catch (error: any) {
     return next(error);
   }
 };

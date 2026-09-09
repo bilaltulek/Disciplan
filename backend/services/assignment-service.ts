@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const db = require('../db');
 
-const listAssignments = async (userId, database = db) => {
+const listAssignments = async (userId: any, database: any = db) => {
   const result = await database.query(
     `SELECT a.*,COUNT(t.id)::int AS total_subtasks,
        COALESCE(SUM(CASE WHEN t.completed THEN 1 ELSE 0 END),0)::int AS completed_subtasks,
@@ -28,7 +28,7 @@ const listAssignments = async (userId, database = db) => {
   return result.rows;
 };
 
-const deleteAssignment = async ({ userId, assignmentId }, database = db) => {
+const deleteAssignment = async ({ userId, assignmentId }: any, database: any = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -47,7 +47,7 @@ const deleteAssignment = async ({ userId, assignmentId }, database = db) => {
     await client.query('DELETE FROM assignments WHERE id=$1 AND user_id=$2', [assignmentId, userId]);
     await client.query('COMMIT');
     return { assignmentId, deletedTaskCount: count.rows[0]?.count || 0 };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -55,7 +55,7 @@ const deleteAssignment = async ({ userId, assignmentId }, database = db) => {
   }
 };
 
-const createManualTask = async ({ userId, assignmentId, task }, database = db) => {
+const createManualTask = async ({ userId, assignmentId, task }: any, database: any = db) => {
   const result = await database.query(
     `INSERT INTO study_tasks (assignment_id,task_description,scheduled_date,estimated_minutes,logical_task_id)
      SELECT a.id,$3,$4,$5,$6 FROM assignments a WHERE a.id=$1 AND a.user_id=$2
@@ -65,7 +65,7 @@ const createManualTask = async ({ userId, assignmentId, task }, database = db) =
   return result.rows[0] || null;
 };
 
-const getPublishedTasks = async ({ userId, assignmentId }, database = db) => {
+const getPublishedTasks = async ({ userId, assignmentId }: any, database: any = db) => {
   const result = await database.query(
     `SELECT t.* FROM study_tasks t JOIN assignments a ON t.assignment_id=a.id
      WHERE t.assignment_id=$1 AND a.user_id=$2 AND t.archived_at IS NULL
@@ -75,7 +75,7 @@ const getPublishedTasks = async ({ userId, assignmentId }, database = db) => {
   return result.rows;
 };
 
-const createPlanFeedback = async ({ userId, assignmentId, feedbackType, comment }, database = db) => {
+const createPlanFeedback = async ({ userId, assignmentId, feedbackType, comment }: any, database: any = db) => {
   const result = await database.query(
     `INSERT INTO plan_feedback (id,user_id,assignment_id,plan_version_id,feedback_type,comment)
      SELECT $1,a.user_id,a.id,p.id,$4,$5 FROM assignments a

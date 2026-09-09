@@ -3,10 +3,10 @@ const db = require('./db');
 
 const ALLOWED_KEYS = new Set(['planning_style', 'task_description_style', 'study_preferences']);
 
-const validateMemory = ({ key, value }) => ALLOWED_KEYS.has(key)
+const validateMemory = ({ key, value }: any) => ALLOWED_KEYS.has(key)
   && typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= 500;
 
-const listMemories = async ({ userId, status }) => {
+const listMemories = async ({ userId, status }: any) => {
   const result = await db.query(
     `SELECT id, memory_key, memory_value, status, confirmed_at, created_at, updated_at
      FROM user_preference_memories
@@ -17,7 +17,7 @@ const listMemories = async ({ userId, status }) => {
   return result.rows;
 };
 
-const proposeMemory = async ({ userId, runId, key, value }) => {
+const proposeMemory = async ({ userId, runId, key, value }: any) => {
   if (!validateMemory({ key, value })) throw Object.assign(new Error('Invalid preference memory.'), { code: 'VALIDATION_FAILED' });
   const existing = await db.query(
     `SELECT * FROM user_preference_memories
@@ -34,7 +34,7 @@ const proposeMemory = async ({ userId, runId, key, value }) => {
   return result.rows[0];
 };
 
-const confirmMemory = async ({ userId, memoryId }) => {
+const confirmMemory = async ({ userId, memoryId }: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -58,13 +58,13 @@ const confirmMemory = async ({ userId, memoryId }) => {
     );
     await client.query('COMMIT');
     return result.rows[0];
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally { client.release(); }
 };
 
-const deleteMemory = async ({ userId, memoryId }) => {
+const deleteMemory = async ({ userId, memoryId }: any) => {
   const result = await db.query('DELETE FROM user_preference_memories WHERE id = $1 AND user_id = $2 RETURNING id', [memoryId, userId]);
   return Boolean(result.rows[0]);
 };

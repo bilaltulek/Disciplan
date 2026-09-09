@@ -2,11 +2,11 @@ const crypto = require('crypto');
 const db = require('./db');
 const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('./agents/runtime-registry');
 
-const hashMessageRequest = ({ content, assignmentId, replyToRunId }) => crypto.createHash('sha256')
+const hashMessageRequest = ({ content, assignmentId, replyToRunId }: any) => crypto.createHash('sha256')
   .update(JSON.stringify({ assignmentId: assignmentId || null, replyToRunId: replyToRunId || null, content }))
   .digest('hex');
 
-const createThreadForUser = async ({ userId, title = null }) => {
+const createThreadForUser = async ({ userId, title = null }: any) => {
   const result = await db.query(
     `INSERT INTO agent_threads (id, user_id, title) VALUES ($1, $2, $3) RETURNING *`,
     [crypto.randomUUID(), userId, title],
@@ -14,7 +14,7 @@ const createThreadForUser = async ({ userId, title = null }) => {
   return result.rows[0];
 };
 
-const listThreadsForUser = async ({ userId, before, limit = 30 }) => {
+const listThreadsForUser = async ({ userId, before, limit = 30 }: any) => {
   const result = await db.query(
     `SELECT id, title, status, summary, last_activity_at, created_at, updated_at
      FROM agent_threads
@@ -26,7 +26,7 @@ const listThreadsForUser = async ({ userId, before, limit = 30 }) => {
   return result.rows;
 };
 
-const getThreadForUser = async ({ userId, threadId, before, limit = 50 }) => {
+const getThreadForUser = async ({ userId, threadId, before, limit = 50 }: any) => {
   const thread = await db.query(
     `SELECT id, title, status, summary, last_activity_at, created_at, updated_at
      FROM agent_threads WHERE id = $1 AND user_id = $2 AND status <> 'deleted'`,
@@ -43,7 +43,7 @@ const getThreadForUser = async ({ userId, threadId, before, limit = 50 }) => {
   return { thread: thread.rows[0], messages: messages.rows.reverse() };
 };
 
-const createMessageRun = async ({ userId, threadId, content, assignmentId, replyToRunId, clientMessageId, idempotencyKey }) => {
+const createMessageRun = async ({ userId, threadId, content, assignmentId, replyToRunId, clientMessageId, idempotencyKey }: any) => {
   const client = await db.connect();
   const requestHash = hashMessageRequest({ content, assignmentId, replyToRunId });
   try {
@@ -134,7 +134,7 @@ const createMessageRun = async ({ userId, threadId, content, assignmentId, reply
     );
     await client.query('COMMIT');
     return { message: message.rows[0], run: run.rows[0], duplicate: false };
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     if (error.code !== '23505') throw error;
     const existingResume = await db.query(

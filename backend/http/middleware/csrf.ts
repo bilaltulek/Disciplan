@@ -6,7 +6,7 @@ const CSRF_COOKIE = 'disciplan_csrf';
 const CSRF_HEADER = 'x-csrf-token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-const appendCookie = (res, value) => {
+const appendCookie = (res: any, value: any) => {
   const existing = res.getHeader('Set-Cookie');
   if (!existing) res.setHeader('Set-Cookie', value);
   else res.setHeader('Set-Cookie', [...(Array.isArray(existing) ? existing : [existing]), value]);
@@ -14,7 +14,7 @@ const appendCookie = (res, value) => {
 
 const createCsrfToken = () => crypto.randomBytes(32).toString('base64url');
 
-const csrfProtection = (req, res, next) => {
+const csrfProtection = (req: any, res: any, next: any) => {
   const cookies = parseCookies(req.headers.cookie || '');
   let csrfToken = cookies[CSRF_COOKIE];
   if (!csrfToken) {

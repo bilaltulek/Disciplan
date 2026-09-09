@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const db = require('../../db');
-const { createRateLimiter, hashKey } = require('./rate-limit.js');
+const { createRateLimiter, hashKey } = require('./rate-limit');
 
 describe('database-backed rate limiting', () => {
   beforeEach(() => vi.restoreAllMocks());

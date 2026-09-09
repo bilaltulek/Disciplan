@@ -1,10 +1,10 @@
 const config = require('../../config.env');
 
-const isAgentRuntimeActiveForRequest = (runtimeConfig, req) => (
+const isAgentRuntimeActiveForRequest = (runtimeConfig: any, req: any) => (
   runtimeConfig.agentExecutionPolicy.effectiveModeForUser(req.user?.id) === 'active'
 );
 
-const agentCapabilitiesForRequest = (runtimeConfig, req) => {
+const agentCapabilitiesForRequest = (runtimeConfig: any, req: any) => {
   const mode = runtimeConfig.agentExecutionPolicy.effectiveModeForUser(req.user?.id);
   return {
     mode,
@@ -15,7 +15,7 @@ const agentCapabilitiesForRequest = (runtimeConfig, req) => {
   };
 };
 
-const requireActiveAgentRuntime = (req, res, next) => {
+const requireActiveAgentRuntime = (req: any, res: any, next: any) => {
   if (!isAgentRuntimeActiveForRequest(config, req)) {
     return res.status(503).json({
       error: 'Conversational agent execution is not active. Assignment forms still use deterministic planning.',

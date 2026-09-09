@@ -1,6 +1,6 @@
 const db = require('../db');
 
-const listTimeline = async (userId, database = db) => {
+const listTimeline = async (userId: any, database: any = db) => {
   const result = await database.query(
     `SELECT t.*,a.title AS assignment_title,a.complexity
      FROM study_tasks t JOIN assignments a ON t.assignment_id=a.id
@@ -11,7 +11,7 @@ const listTimeline = async (userId, database = db) => {
   return result.rows;
 };
 
-const listHistory = async (userId, database = db) => {
+const listHistory = async (userId: any, database: any = db) => {
   const result = await database.query(
     `SELECT t.*,a.title AS assignment_title,a.complexity
      FROM study_tasks t JOIN assignments a ON t.assignment_id=a.id
@@ -22,7 +22,7 @@ const listHistory = async (userId, database = db) => {
   return result.rows;
 };
 
-const updateTask = async ({ userId, taskId, patch }, database = db) => {
+const updateTask = async ({ userId, taskId, patch }: any, database: any = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -51,7 +51,7 @@ const updateTask = async ({ userId, taskId, patch }, database = db) => {
     );
     await client.query('COMMIT');
     return true;
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
     throw error;
   } finally {
@@ -59,7 +59,7 @@ const updateTask = async ({ userId, taskId, patch }, database = db) => {
   }
 };
 
-const deleteTask = async ({ userId, taskId }, database = db) => {
+const deleteTask = async ({ userId, taskId }: any, database: any = db) => {
   const result = await database.query(
     `DELETE FROM study_tasks WHERE id=$1
        AND assignment_id IN (SELECT id FROM assignments WHERE user_id=$2)
@@ -69,7 +69,7 @@ const deleteTask = async ({ userId, taskId }, database = db) => {
   return result.rowCount > 0;
 };
 
-const toggleTask = async ({ userId, taskId, completed }, database = db) => {
+const toggleTask = async ({ userId, taskId, completed }: any, database: any = db) => {
   const result = await database.query(
     `UPDATE study_tasks SET completed=$1,
        completed_at=CASE WHEN $1 THEN COALESCE(completed_at,CURRENT_TIMESTAMP) ELSE NULL END
