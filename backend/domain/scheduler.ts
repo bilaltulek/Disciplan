@@ -7,7 +7,7 @@ const DEFAULT_PROFILE = Object.freeze({
   preferredSessionMinutes: 45,
 });
 
-const normalizeProfile = (profile = {}) => {
+const normalizeProfile = (profile: any = {}) => {
   const supplied = profile || {};
   return ({
   ...DEFAULT_PROFILE,
@@ -21,9 +21,9 @@ const normalizeProfile = (profile = {}) => {
   });
 };
 
-const buildDailyCapacity = ({ startDate, dueDate, profile, existingLoad = {} }) => {
+const buildDailyCapacity = ({ startDate, dueDate, profile, existingLoad = {} }: any) => {
   const normalized = normalizeProfile(profile);
-  return enumerateDates(startDate, dueDate).map((date) => {
+  return enumerateDates(startDate, dueDate).map((date: any) => {
     const available = Number(normalized.weekdayAvailableMinutes[weekday(date)] || 0);
     const limit = Math.min(available, normalized.maxDailyMinutes);
     return {
@@ -33,10 +33,10 @@ const buildDailyCapacity = ({ startDate, dueDate, profile, existingLoad = {} }) 
   });
 };
 
-const allocateTasks = ({ descriptions, startDate, dueDate, profile, existingLoad = {} }) => {
+const allocateTasks = ({ descriptions, startDate, dueDate, profile, existingLoad = {} }: any) => {
   const normalized = normalizeProfile(profile);
   const days = buildDailyCapacity({ startDate, dueDate, profile: normalized, existingLoad });
-  const totalCapacity = days.reduce((sum, day) => sum + day.capacityMinutes, 0);
+  const totalCapacity = days.reduce((sum: any, day: any) => sum + day.capacityMinutes, 0);
   if (!Array.isArray(descriptions) || descriptions.length === 0 || totalCapacity < 1) return [];
 
   const minimumSession = Math.min(15, normalized.preferredSessionMinutes);
@@ -44,10 +44,10 @@ const allocateTasks = ({ descriptions, startDate, dueDate, profile, existingLoad
   const selected = taskLimit === 1
     ? [descriptions.at(-1)]
     : [...descriptions.slice(0, taskLimit - 1), descriptions.at(-1)];
-  const mutableDays = days.map((day) => ({ ...day, remaining: day.capacityMinutes }));
+  const mutableDays = days.map((day: any) => ({ ...day, remaining: day.capacityMinutes }));
 
   return selected.map((description) => {
-    const day = mutableDays.find((candidate) => candidate.remaining > 0);
+    const day = mutableDays.find((candidate: any) => candidate.remaining > 0);
     if (!day) return null;
     const duration = Math.min(normalized.preferredSessionMinutes, day.remaining);
     day.remaining -= duration;

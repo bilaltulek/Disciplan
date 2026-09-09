@@ -7,11 +7,11 @@ import { z } from 'zod';
 
 import type { PlanTaskInput } from './agent-types.js';
 
-const config = require('./config.env.js');
-const planner = require('./gemini-planner.js');
-const runs = require('./agent-runs.js');
-const budget = require('./ai-usage.js');
-const { validatePlan } = require('./plan-validator.js');
+const config = require('./config.env');
+const planner = require('./gemini-planner');
+const runs = require('./agent-runs');
+const budget = require('./ai-usage');
+const { validatePlan } = require('./plan-validator');
 
 type PlanningContext = {
   id: string;

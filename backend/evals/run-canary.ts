@@ -11,10 +11,10 @@ import {
   type EvaluationOutcome,
 } from './evaluator.js';
 
-const config = require('../config.env.js');
-const { addDays, todayInTimezone } = require('../domain/date-only.js');
-const { validatePlan } = require('../plan-validator.js');
-const budget = require('../ai-usage.js');
+const config = require('../config.env');
+const { addDays, todayInTimezone } = require('../domain/date-only');
+const { validatePlan } = require('../plan-validator');
+const budget = require('../ai-usage');
 
 const tasksForValidation = (tasks: Array<{
   taskDescription: string;

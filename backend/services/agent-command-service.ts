@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import type { CreateAssignmentRequest } from '../../shared/contracts.js';
 import { withTransaction } from '../infrastructure/transactions.js';
 
-const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('../agents/runtime-registry.js') as {
+const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('../agents/runtime-registry') as {
   GRAPH_VERSION: string;
   PROMPT_BUNDLE_VERSION: string;
 };

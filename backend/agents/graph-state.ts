@@ -1,7 +1,7 @@
 import { Annotation } from '@langchain/langgraph';
 import type { PlanDraft, PlanTaskInput } from '../../shared/contracts.js';
 
-const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('./runtime-registry.js') as {
+const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('./runtime-registry') as {
   GRAPH_VERSION: string;
   PROMPT_BUNDLE_VERSION: string;
 };

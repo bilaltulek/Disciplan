@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(__filename);
-const { deleteAccountCheckpoints } = require('./validation-accounts.js');
+const { deleteAccountCheckpoints } = require('./validation-accounts');
 
 describe('validation account cleanup', () => {
   it('deletes checkpoint writes, blobs, and checkpoints before user rows cascade', async () => {

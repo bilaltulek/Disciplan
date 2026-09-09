@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-const { allocateTasks } = require('./scheduler.js');
+const { allocateTasks } = require('./scheduler');
 
 describe('scheduler properties', () => {
   it('never exceeds capacity and is deterministic for arbitrary bounded workloads', () => {

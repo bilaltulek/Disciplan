@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { deleteExpiredAgentMemory, executeAgentRun } from './agent-graph.js';
 
-const config = require('./config.env.js');
-const jobs = require('./agent-runs.js');
+const config = require('./config.env');
+const jobs = require('./agent-runs');
 
 const workerId = `disciplan-worker-${crypto.randomUUID()}`;
 

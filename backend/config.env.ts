@@ -5,12 +5,12 @@ const {
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 require('dotenv').config();
 
-const toInt = (value, fallback) => {
+const toInt = (value: any, fallback: any) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) ? parsed : fallback;
 };
 
-const toPositiveInt = (value, fallback, name) => {
+const toPositiveInt = (value: any, fallback: any, name: any) => {
   if (value === undefined) return fallback;
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -19,7 +19,7 @@ const toPositiveInt = (value, fallback, name) => {
   return parsed;
 };
 
-const toNonNegativeInt = (value, fallback, name) => {
+const toNonNegativeInt = (value: any, fallback: any, name: any) => {
   if (value === undefined) return fallback;
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || parsed < 0) {
@@ -28,7 +28,7 @@ const toNonNegativeInt = (value, fallback, name) => {
   return parsed;
 };
 
-const toPositiveFloat = (value, fallback, name) => {
+const toPositiveFloat = (value: any, fallback: any, name: any) => {
   if (value === undefined) return fallback;
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -37,9 +37,9 @@ const toPositiveFloat = (value, fallback, name) => {
   return parsed;
 };
 
-const parseOrigins = (raw) => (raw || '').split(',').map((origin) => origin.trim()).filter(Boolean);
-const toBoolean = (value) => value === 'true';
-const toEnum = (value, fallback, allowed, name) => {
+const parseOrigins = (raw: any) => (raw || '').split(',').map((origin: any) => origin.trim()).filter(Boolean);
+const toBoolean = (value: any) => value === 'true';
+const toEnum = (value: any, fallback: any, allowed: any, name: any) => {
   const selected = value || fallback;
   if (!allowed.includes(selected)) {
     throw new Error(`Invalid environment variable: ${name} must be one of ${allowed.join(', ')}.`);
@@ -50,7 +50,7 @@ const previewOrigin = () => {
   if (process.env.VERCEL_ENV !== 'preview' || !process.env.VERCEL_URL) return [];
   return [`https://${process.env.VERCEL_URL.trim()}`];
 };
-const isValidWorkosRedirectUri = (value) => {
+const isValidWorkosRedirectUri = (value: any) => {
   if (!value) return false;
   try {
     const parsed = new URL(value);

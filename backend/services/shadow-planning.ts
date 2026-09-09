@@ -2,8 +2,8 @@ import crypto from 'node:crypto';
 import type { Pool } from 'pg';
 import { withTransaction } from '../infrastructure/transactions.js';
 
-const { todayInTimezone } = require('../domain/date-only.js');
-const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('../agents/runtime-registry.js') as {
+const { todayInTimezone } = require('../domain/date-only');
+const { GRAPH_VERSION, PROMPT_BUNDLE_VERSION } = require('../agents/runtime-registry') as {
   GRAPH_VERSION: string;
   PROMPT_BUNDLE_VERSION: string;
 };

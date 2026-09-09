@@ -1,8 +1,8 @@
 import type { DisciplanState } from './graph-state.js';
 
-const planner = require('../gemini-planner.js');
-const { allocateTasks } = require('../domain/scheduler.js');
-const { todayInTimezone } = require('../domain/date-only.js');
+const planner = require('../gemini-planner');
+const { allocateTasks } = require('../domain/scheduler');
+const { todayInTimezone } = require('../domain/date-only');
 
 export const fallbackDraft = (state: DisciplanState) => {
   if (!state.assignment) throw new Error('Assignment context is unavailable.');

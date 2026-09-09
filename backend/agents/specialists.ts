@@ -7,7 +7,7 @@ import type { AssistantResponse, DisciplanState, IntentEnvelope, ReviewResult } 
 import { normalizeGoogleModelError, type ModelGateway } from './model-gateway.js';
 import { defineGovernedTool, type Capability, type ToolAuditEvent, type ToolContext } from './tool-registry.js';
 
-const { PROMPTS } = require('./runtime-registry.js') as {
+const { PROMPTS } = require('./runtime-registry') as {
   PROMPTS: Record<'coordinator' | 'planner' | 'repair' | 'reviewer' | 'tutor', string>;
 };
 

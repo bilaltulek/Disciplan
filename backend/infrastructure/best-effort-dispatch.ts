@@ -3,7 +3,7 @@ const config = require('../config.env');
 const logger = require('./logger');
 const { loadConfiguredTriggerSdk } = require('./trigger-client-config');
 
-const dispatchRunBestEffort = async (runId) => {
+const dispatchRunBestEffort = async (runId: any) => {
   if (!process.env.TRIGGER_SECRET_KEY) return { attempted: false };
   if (config.agentRolloutMode === 'off') {
     const owned = await db.query('SELECT user_id FROM agent_runs WHERE id = $1', [runId]);

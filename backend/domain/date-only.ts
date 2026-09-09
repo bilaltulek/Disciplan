@@ -1,6 +1,6 @@
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-const parseDateOnly = (value) => {
+const parseDateOnly = (value: any) => {
   const match = DATE_ONLY_PATTERN.exec(value || '');
   if (!match) return null;
   const year = Number(match[1]);
@@ -11,15 +11,15 @@ const parseDateOnly = (value) => {
   return roundTrip === value ? { year, month, day, ordinal } : null;
 };
 
-const formatOrdinal = (ordinal) => new Date(ordinal * 86_400_000).toISOString().slice(0, 10);
+const formatOrdinal = (ordinal: any) => new Date(ordinal * 86_400_000).toISOString().slice(0, 10);
 
-const addDays = (value, count) => {
+const addDays = (value: any, count: any) => {
   const parsed = parseDateOnly(value);
   if (!parsed || !Number.isInteger(count)) throw new TypeError('A valid date-only value and integer day count are required.');
   return formatOrdinal(parsed.ordinal + count);
 };
 
-const weekday = (value) => {
+const weekday = (value: any) => {
   const parsed = parseDateOnly(value);
   if (!parsed) throw new TypeError('A valid date-only value is required.');
   return new Date(parsed.ordinal * 86_400_000).getUTCDay();
@@ -36,7 +36,7 @@ const todayInTimezone = (timezone = 'UTC', now = new Date()) => {
   return `${values.year}-${values.month}-${values.day}`;
 };
 
-const enumerateDates = (start, end) => {
+const enumerateDates = (start: any, end: any) => {
   const first = parseDateOnly(start);
   const last = parseDateOnly(end);
   if (!first || !last || first.ordinal > last.ordinal) return [];

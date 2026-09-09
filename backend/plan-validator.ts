@@ -3,7 +3,7 @@ const { parseDateOnly, todayInTimezone } = require('./domain/date-only');
 const { normalizeProfile } = require('./domain/scheduler');
 const { validateFocusTopicCoverage } = require('./domain/content-alignment');
 
-const validatePlan = ({ tasks, assignment, profile, existingLoad = {}, today, completedLogicalTaskIds = [] }) => {
+const validatePlan = ({ tasks, assignment, profile, existingLoad = {}, today, completedLogicalTaskIds = [] }: any) => {
   const issues = [];
   if (!Array.isArray(tasks) || tasks.length === 0) return ['A study plan must contain at least one task.'];
   if (tasks.length > MAX_TASKS) issues.push(`A plan may not contain more than ${MAX_TASKS} tasks.`);

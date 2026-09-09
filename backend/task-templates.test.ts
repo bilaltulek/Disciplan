@@ -2,8 +2,8 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(__filename);
-const templates = require('./task-templates.js');
-const planner = require('./gemini-planner.js');
+const templates = require('./task-templates');
+const planner = require('./gemini-planner');
 
 const osAssignment = {
   title: 'OS chapter 1',

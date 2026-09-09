@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(__filename);
-const { agentCapabilitiesForRequest, isAgentRuntimeActiveForRequest } = require('./agent-runtime.js');
+const { agentCapabilitiesForRequest, isAgentRuntimeActiveForRequest } = require('./agent-runtime');
 
 describe('agent runtime request boundary', () => {
   it('uses the centralized effective mode for the authenticated actor', () => {

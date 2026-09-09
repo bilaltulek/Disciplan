@@ -2,7 +2,7 @@ import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import crypto from 'node:crypto';
 import { Command } from '@langchain/langgraph';
 import type { Pool, PoolClient } from 'pg';
-import { createInitialGraphState, type DisciplanState } from './graph-state.js';
+import { createInitialGraphState } from './graph-state.js';
 import { GeminiModelGateway } from './model-gateway.js';
 import { groundTutorResources } from './grounded-resources.js';
 import { createSpecialists } from './specialists.js';
@@ -12,13 +12,13 @@ import { applyPrePublishValidationPause, resolveValidationFault } from './valida
 import { PlanVersionService } from '../services/plan-version-service.js';
 import { CreateAssignmentRequestSchema } from '../../shared/contracts.js';
 
-const db = require('../worker-db.js') as Pool;
-const config = require('../config.env.js');
-const budget = require('../ai-usage.js');
-const { validatePlan } = require('../plan-validator.js');
-const { todayInTimezone } = require('../domain/date-only.js');
-const { proposeMemory } = require('../preference-memories.js');
-const logger = require('../infrastructure/logger.js');
+const db = require('../worker-db') as Pool;
+const config = require('../config.env');
+const budget = require('../ai-usage');
+const { validatePlan } = require('../plan-validator');
+const { todayInTimezone } = require('../domain/date-only');
+const { proposeMemory } = require('../preference-memories');
+const logger = require('../infrastructure/logger');
 
 const TRANSIENT_RUN_FAILURE_CODES = new Set([
   '40001', '40P01', '53300', '57P01', '08000', '08003', '08006',

@@ -1,7 +1,7 @@
 import type { Pool } from 'pg';
 import type { AgentTaskProvider } from '../infrastructure/trigger-provider.js';
 
-const logger = require('../infrastructure/logger.js');
+const logger = require('../infrastructure/logger');
 
 type OutboxRecord = { id: string; run_id: string; dispatch_key: string; attempt_count: number; user_id: number };
 

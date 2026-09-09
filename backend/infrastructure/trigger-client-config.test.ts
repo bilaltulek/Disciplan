@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-const { getTriggerClientConfiguration } = require('./trigger-client-config.js');
+const { getTriggerClientConfiguration } = require('./trigger-client-config');
 
 describe('Trigger API client configuration', () => {
   it('suppresses Vercel branch routing only for the isolated Preview API', () => {

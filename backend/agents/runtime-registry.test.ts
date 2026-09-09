@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-const registry = require('./runtime-registry.js');
+const registry = require('./runtime-registry');
 
 describe('agent runtime registry', () => {
   it('pins graph and prompt versions and hashes the complete prompt bundle', () => {

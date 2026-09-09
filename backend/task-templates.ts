@@ -233,7 +233,7 @@ const durationEstimates = {
 };
 
 // Helper function to get subject from assignment title/description
-const matchesAny = (text, patterns) => patterns.some((pattern) => pattern.test(text));
+const matchesAny = (text: any, patterns: any) => patterns.some((pattern: any) => pattern.test(text));
 
 const subjectPatterns = {
   operating_systems: [
@@ -284,23 +284,23 @@ const focusTopicPatterns = [
   { label: 'Unix/Linux', patterns: [/\bunix\b/i, /\blinux\b/i] },
 ];
 
-function detectSubject(title, description) {
+function detectSubject(title: any, description: any) {
   const text = `${title || ''} ${description || ''}`;
   for (const subject of ['operating_systems', 'mathematics', 'physics', 'english', 'computer_science']) {
-    if (matchesAny(text, subjectPatterns[subject])) return subject;
+    if (matchesAny(text, (subjectPatterns as Record<string, RegExp[]>)[subject])) return subject;
   }
   return 'generic';
 }
 
-function detectWorkType(title, description) {
+function detectWorkType(title: any, description: any) {
   const text = `${title || ''} ${description || ''}`;
   for (const workType of ['writing', 'implementation', 'problem_set', 'study_review']) {
-    if (matchesAny(text, workTypePatterns[workType])) return workType;
+    if (matchesAny(text, (workTypePatterns as Record<string, RegExp[]>)[workType])) return workType;
   }
   return 'general_project';
 }
 
-function extractFocusTopics(title, description, limit = 8) {
+function extractFocusTopics(title: any, description: any, limit = 8) {
   const text = `${title || ''} ${description || ''}`;
   return focusTopicPatterns
     .filter(({ patterns }) => matchesAny(text, patterns))
@@ -308,12 +308,12 @@ function extractFocusTopics(title, description, limit = 8) {
     .slice(0, Math.max(0, Math.min(limit, 8)));
 }
 
-function buildStudyReviewTasks({ title, subject, focusTopics, complexity }) {
+function buildStudyReviewTasks({ title, subject, focusTopics, complexity }: any) {
   const boundedTopics = focusTopics.slice(0, complexity === 'Easy' ? 3 : complexity === 'Hard' ? 8 : 6);
   const topicSummary = boundedTopics.length ? boundedTopics.join(', ') : 'the requested concepts';
   const tasks = [];
   if (title) tasks.push(`Preview ${title} and map its learning objectives to ${topicSummary}`);
-  tasks.push(...boundedTopics.map((topic) => `Review and practice ${topic} with notes and a small worked example`));
+  tasks.push(...boundedTopics.map((topic: any) => `Review and practice ${topic} with notes and a small worked example`));
   if (subject === 'operating_systems') {
     tasks.push('Trace how the requested operating-systems concepts behave in a small C example');
   } else {
@@ -323,7 +323,7 @@ function buildStudyReviewTasks({ title, subject, focusTopics, complexity }) {
   return [...new Set(tasks)];
 }
 
-function getAssignmentTasks({ title, description, complexity = 'Medium' }) {
+function getAssignmentTasks({ title, description, complexity = 'Medium' }: any) {
   const subject = detectSubject(title, description);
   const workType = detectWorkType(title, description);
   const focusTopics = extractFocusTopics(title, description);
@@ -338,21 +338,23 @@ function getAssignmentTasks({ title, description, complexity = 'Medium' }) {
 }
 
 // Get tasks for a given subject and complexity
-function getTasks(subject, complexity) {
+function getTasks(subject: any, complexity: any) {
   const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_');
+  const templates = taskTemplates as Record<string, Record<string, string[]>>;
   
-  if (taskTemplates[normalizedSubject] && taskTemplates[normalizedSubject][complexity]) {
-    return taskTemplates[normalizedSubject][complexity];
+  if (templates[normalizedSubject] && templates[normalizedSubject][complexity]) {
+    return templates[normalizedSubject][complexity];
   }
   
-  return taskTemplates.generic[complexity];
+  return templates.generic[complexity];
 }
 
 // Get estimated duration for a task
-function getEstimatedDuration(subject, complexity) {
+function getEstimatedDuration(subject: any, complexity: any) {
   const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_');
+  const estimates = durationEstimates as Record<string, Record<string, number[]>>;
   
-  const durations = durationEstimates[normalizedSubject] || durationEstimates.generic;
+  const durations = estimates[normalizedSubject] || estimates.generic;
   const options = durations[complexity];
   
   return options[Math.floor(options.length / 2)];

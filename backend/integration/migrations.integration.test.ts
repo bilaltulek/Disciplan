@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databaseIntegrationEnabled, resolveSuppliedTestDatabaseUrl } from './test-database.js';
 
 const require = createRequire(__filename);
-const { runMigrations } = require('../scripts/migrate.js');
+const { runMigrations } = require('../scripts/migrate');
 const suppliedUrl = resolveSuppliedTestDatabaseUrl(process.env.TEST_DATABASE_URL);
 const enabled = databaseIntegrationEnabled(process.env);
 

@@ -39,11 +39,12 @@ const MODEL_PRICING = Object.freeze({
   }),
 });
 
-const getModelPricing = (model) => {
-  const pricing = MODEL_PRICING[model];
+const getModelPricing = (model: string) => {
+  const pricing = (MODEL_PRICING as Record<string, (typeof MODEL_PRICING)[keyof typeof MODEL_PRICING]>)[model];
   if (!pricing) {
-    const error = new Error(`No governed pricing is configured for model: ${model}`);
-    error.code = 'MODEL_PRICING_UNKNOWN';
+    const error = Object.assign(new Error(`No governed pricing is configured for model: ${model}`), {
+      code: 'MODEL_PRICING_UNKNOWN',
+    });
     throw error;
   }
   return pricing;

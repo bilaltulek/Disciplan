@@ -14,19 +14,19 @@ const topicCoveragePatterns = {
   'Unix/Linux': [/\bunix\b/i, /\blinux\b/i],
 };
 
-const getMissingFocusTopics = ({ assignment, tasks }) => {
+const getMissingFocusTopics = ({ assignment, tasks }: any) => {
   const requested = extractFocusTopics(assignment?.title, assignment?.description);
   if (!requested.length) return [];
   const planText = (Array.isArray(tasks) ? tasks : [])
     .map((task) => task?.task_description || task?.taskDescription || '')
     .join(' ');
-  return requested.filter((topic) => {
-    const patterns = topicCoveragePatterns[topic] || [];
-    return !patterns.some((pattern) => pattern.test(planText));
+  return requested.filter((topic: any) => {
+    const patterns = (topicCoveragePatterns as Record<string, RegExp[]>)[topic] || [];
+    return !patterns.some((pattern: any) => pattern.test(planText));
   });
 };
 
-const validateFocusTopicCoverage = (input) => {
+const validateFocusTopicCoverage = (input: any) => {
   const missing = getMissingFocusTopics(input);
   return missing.length
     ? [`[CONTENT_ALIGNMENT_FAILED] The plan must explicitly cover: ${missing.join(', ')}.`]

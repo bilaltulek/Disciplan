@@ -1,6 +1,6 @@
-const parseUserIds = (raw, name) => {
+const parseUserIds = (raw: any, name: any) => {
   if (!raw || !raw.trim()) return new Set();
-  const ids = raw.split(',').map((value) => value.trim()).filter(Boolean).map((value) => {
+  const ids = raw.split(',').map((value: any) => value.trim()).filter(Boolean).map((value: any) => {
     if (!/^\d+$/.test(value) || Number(value) <= 0 || !Number.isSafeInteger(Number(value))) {
       throw new Error(`Invalid environment variable: ${name} must contain comma-separated positive integer user IDs.`);
     }
@@ -9,7 +9,7 @@ const parseUserIds = (raw, name) => {
   return new Set(ids);
 };
 
-const canonicalNeonDatabase = (raw, name) => {
+const canonicalNeonDatabase = (raw: any, name: any) => {
   let url;
   try {
     url = new URL(raw);
@@ -26,7 +26,7 @@ const canonicalNeonDatabase = (raw, name) => {
   };
 };
 
-const assertMatchingAgentDatabases = ({ databaseUrl, agentDatabaseUrl, message }) => {
+const assertMatchingAgentDatabases = ({ databaseUrl, agentDatabaseUrl, message }: any) => {
   const application = canonicalNeonDatabase(databaseUrl, 'DATABASE_URL');
   const agent = canonicalNeonDatabase(agentDatabaseUrl, 'AGENT_DATABASE_URL');
   if (!application.pooled || agent.pooled
@@ -35,7 +35,7 @@ const assertMatchingAgentDatabases = ({ databaseUrl, agentDatabaseUrl, message }
   }
 };
 
-const assertMatchingValidationDatabases = ({ policy, databaseUrl, agentDatabaseUrl }) => {
+const assertMatchingValidationDatabases = ({ policy, databaseUrl, agentDatabaseUrl }: any) => {
   if (policy.validationMode !== 'development') return;
   assertMatchingAgentDatabases({
     databaseUrl,
@@ -46,7 +46,7 @@ const assertMatchingValidationDatabases = ({ policy, databaseUrl, agentDatabaseU
 
 const assertPreviewRuntimeConfiguration = ({
   runtimeScope, executionRuntime, rolloutMode, dataEnvironment, vercelEnvironment, databaseUrl, agentDatabaseUrl,
-}) => {
+}: any) => {
   if (runtimeScope !== 'preview') return;
   if (dataEnvironment !== 'isolated-preview') {
     throw new Error('Preview agent runtime requires DISCIPLAN_DATA_ENV=isolated-preview.');
@@ -81,7 +81,7 @@ const createAgentExecutionPolicy = ({
   activeUserIds = '',
   shadowUserIds = '',
   validationFaultsEnabled = false,
-}) => {
+}: any) => {
   if (!['disabled', 'development'].includes(validationMode)) {
     throw new Error('Invalid environment variable: AGENT_VALIDATION_MODE must be disabled or development.');
   }
@@ -108,7 +108,7 @@ const createAgentExecutionPolicy = ({
     throw new Error('Validation allowlists and fault fixtures require AGENT_VALIDATION_MODE=development.');
   }
 
-  const effectiveModeForUser = (userId) => {
+  const effectiveModeForUser = (userId: any) => {
     if (rolloutMode !== 'off') return rolloutMode;
     if (validationMode !== 'development') return 'off';
     const id = Number(userId);
@@ -124,8 +124,8 @@ const createAgentExecutionPolicy = ({
     activeUserIds: Object.freeze([...active]),
     shadowUserIds: Object.freeze([...shadow]),
     effectiveModeForUser,
-    isValidationUser: (userId) => effectiveModeForUser(userId) !== 'off' && rolloutMode === 'off',
-    canDispatchUser: (userId) => effectiveModeForUser(userId) !== 'off',
+    isValidationUser: (userId: any) => effectiveModeForUser(userId) !== 'off' && rolloutMode === 'off',
+    canDispatchUser: (userId: any) => effectiveModeForUser(userId) !== 'off',
   });
 };
 

@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 const require = createRequire(__filename);
-const { assertMatchingValidationDatabases, createAgentExecutionPolicy } = require('./agent-execution-policy.js');
+const { assertMatchingValidationDatabases, createAgentExecutionPolicy } = require('./agent-execution-policy');
 
 describe('development validation execution policy', () => {
   it('keeps global off mode for ordinary users while scoping active and shadow behavior', () => {

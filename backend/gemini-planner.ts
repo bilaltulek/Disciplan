@@ -4,7 +4,7 @@ const { todayInTimezone } = require('./domain/date-only');
 
 // Compatibility module for deterministic planning. Production model access
 // lives exclusively behind backend/agents/model-gateway.ts.
-const buildFallbackPlan = (assignment) => {
+const buildFallbackPlan = (assignment: any) => {
   const classification = getAssignmentTasks({
     title: assignment.title,
     description: assignment.description,
@@ -24,7 +24,7 @@ const buildFallbackPlan = (assignment) => {
 
 // Retained for the reviewer data-boundary regression test. It does not invoke
 // a model and is not part of the active graph prompt bundle.
-const buildReviewPrompt = ({ assignment, tasks, validationIssues }) => {
+const buildReviewPrompt = ({ assignment, tasks, validationIssues }: any) => {
   const reviewInput = {
     assignment: {
       title: assignment.title,

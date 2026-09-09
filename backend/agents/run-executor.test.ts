@@ -3,7 +3,7 @@ import type { PlanDraft } from '../../shared/contracts.js';
 import { createInitialGraphState } from './graph-state.js';
 import { classifyRunFailure, fallbackDraft } from './run-executor.js';
 
-const { addDays, todayInTimezone } = require('../domain/date-only.js') as {
+const { addDays, todayInTimezone } = require('../domain/date-only') as {
   addDays: (date: string, count: number) => string;
   todayInTimezone: (timezone: string) => string;
 };

@@ -30,10 +30,10 @@ describe.skipIf(!enabled)('HTTP security and ownership with Postgres', () => {
     process.env.AGENT_DATABASE_URL = databaseUrl;
     process.env.JWT_SECRET = jwtSecret;
     process.env.AGENT_ROLLOUT_MODE = 'off';
-    const { runMigrations } = require('../scripts/migrate.js');
+    const { runMigrations } = require('../scripts/migrate');
     await runMigrations({ client: pool });
-    app = require('../app.js');
-    applicationPool = require('../db.js');
+    app = require('../app');
+    applicationPool = require('../db');
   }, 120_000);
 
   afterAll(async () => {

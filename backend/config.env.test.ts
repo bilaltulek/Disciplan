@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const runConfigProbe = (expression: string, overrides: Record<string, string> = {}) => spawnSync(
   process.execPath,
-  ['-e', `const config = require('./backend/config.env.js'); ${expression}`],
+  ['--require', 'tsx/cjs', '-e', `const config = require('./backend/config.env'); ${expression}`],
   {
     cwd: process.cwd(),
     encoding: 'utf8',

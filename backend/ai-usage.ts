@@ -22,7 +22,7 @@ const getMonthlySpendMicroUsd = async (client = db) => {
   return Number.parseInt(result.rows[0]?.total, 10) || 0;
 };
 
-const getUserDailyAiRequestCount = async (userId, client = db) => {
+const getUserDailyAiRequestCount = async (userId: any, client = db) => {
   const result = await client.query(
     `SELECT COUNT(*)::int AS count
      FROM ai_usage_events
@@ -35,9 +35,9 @@ const getUserDailyAiRequestCount = async (userId, client = db) => {
   return result.rows[0]?.count || 0;
 };
 
-const toMicroUsd = (usdAmount) => Math.round(usdAmount * MICRO_USD_PER_USD);
+const toMicroUsd = (usdAmount: any) => Math.round(usdAmount * MICRO_USD_PER_USD);
 
-const getActiveReservationTotals = async ({ userId, client = db }) => {
+const getActiveReservationTotals = async ({ userId, client = db }: any) => {
   const result = await client.query(
     `SELECT
       COALESCE(SUM(GREATEST(reserved_total_micro_usd - used_total_micro_usd, 0)), 0)::bigint AS reserved_micro_usd,
@@ -53,7 +53,7 @@ const getActiveReservationTotals = async ({ userId, client = db }) => {
   };
 };
 
-const estimateCostMicroUsd = ({ model, promptTokens, outputTokens }) => {
+const estimateCostMicroUsd = ({ model, promptTokens, outputTokens }: any) => {
   const pricing = getModelPricing(model);
   const inputMicroUsd = Math.round((promptTokens / 1_000_000) * pricing.inputMicroUsdPerMillionTokens);
   const outputMicroUsd = Math.round((outputTokens / 1_000_000) * pricing.outputMicroUsdPerMillionTokens);
@@ -65,7 +65,7 @@ const estimateCostMicroUsd = ({ model, promptTokens, outputTokens }) => {
   };
 };
 
-const extractUsageMetadata = (response) => {
+const extractUsageMetadata = (response: any) => {
   const usage = response?.usageMetadata || {};
 
   const promptTokens = usage.promptTokenCount
@@ -102,7 +102,7 @@ const recordAiUsageEvent = async ({
   status = DEFAULT_STATUS,
   runId = null,
   agentRunId = null,
-}, database = db) => {
+}: any, database = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -163,7 +163,7 @@ const recordAiUsageEvent = async ({
   }
 };
 
-const reserveRunBudget = async ({ runId, userId, reservedTotalMicroUsd, reservedRequestCount }) => {
+const reserveRunBudget = async ({ runId, userId, reservedTotalMicroUsd, reservedRequestCount }: any) => {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
@@ -206,7 +206,7 @@ const reserveRunBudget = async ({ runId, userId, reservedTotalMicroUsd, reserved
   }
 };
 
-const finalizeRunBudget = async ({ runId, status }) => {
+const finalizeRunBudget = async ({ runId, status }: any) => {
   if (!['finalized', 'released'].includes(status)) throw new Error('Invalid budget reservation terminal status.');
   await db.query(
     `UPDATE ai_budget_reservations
@@ -216,7 +216,7 @@ const finalizeRunBudget = async ({ runId, status }) => {
   );
 };
 
-const canUseReservedModelCall = async (runId) => {
+const canUseReservedModelCall = async (runId: any) => {
   const result = await db.query(
     `SELECT 1 FROM ai_budget_reservations
      WHERE run_id = $1 AND status = 'active' AND used_request_count < reserved_request_count`,
@@ -225,7 +225,7 @@ const canUseReservedModelCall = async (runId) => {
   return result.rowCount > 0;
 };
 
-const reserveAgentRunBudget = async ({ agentRunId, userId, reservedTotalMicroUsd, reservedRequestCount }, database = db) => {
+const reserveAgentRunBudget = async ({ agentRunId, userId, reservedTotalMicroUsd, reservedRequestCount }: any, database = db) => {
   const client = await database.connect();
   try {
     await client.query('BEGIN');
@@ -269,7 +269,7 @@ const reserveAgentRunBudget = async ({ agentRunId, userId, reservedTotalMicroUsd
   }
 };
 
-const finalizeAgentRunBudget = async ({ agentRunId, status }, database = db) => {
+const finalizeAgentRunBudget = async ({ agentRunId, status }: any, database = db) => {
   if (!['finalized', 'released'].includes(status)) throw new Error('Invalid budget reservation terminal status.');
   await database.query(
     `UPDATE ai_budget_reservations
@@ -279,7 +279,7 @@ const finalizeAgentRunBudget = async ({ agentRunId, status }, database = db) => 
   );
 };
 
-const canUseReservedAgentModelCall = async (agentRunId, database = db) => {
+const canUseReservedAgentModelCall = async (agentRunId: any, database = db) => {
   const result = await database.query(
     `SELECT 1 FROM ai_budget_reservations
      WHERE agent_run_id = $1
@@ -291,7 +291,7 @@ const canUseReservedAgentModelCall = async (agentRunId, database = db) => {
   return result.rowCount > 0;
 };
 
-const getBudgetGuardDecision = async (userId) => {
+const getBudgetGuardDecision = async (userId: any) => {
   const [monthlyMicroUsd, dailyCount, monthlyReservations, userReservations] = await Promise.all([
     getMonthlySpendMicroUsd(),
     getUserDailyAiRequestCount(userId),
