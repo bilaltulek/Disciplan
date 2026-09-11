@@ -47,9 +47,12 @@ const toEnum = (value: any, fallback: any, allowed: any, name: any) => {
   }
   return selected;
 };
-const previewOrigin = () => {
-  if (process.env.VERCEL_ENV !== 'preview' || !process.env.VERCEL_URL) return [];
-  return [`https://${process.env.VERCEL_URL.trim()}`];
+const previewOrigins = () => {
+  if (process.env.VERCEL_ENV !== 'preview') return [];
+  return [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+    .map((hostname) => hostname?.trim())
+    .filter(Boolean)
+    .map((hostname) => `https://${hostname}`);
 };
 const isValidWorkosRedirectUri = (value: any) => {
   if (!value) return false;
@@ -189,7 +192,7 @@ const config: EnvironmentConfiguration = {
   agentExecutionPolicy,
   corsOrigins: [...new Set([
     ...parseOrigins(process.env.CORS_ORIGINS || 'http://localhost:5173'),
-    ...previewOrigin(),
+    ...previewOrigins(),
   ])],
   // The Docker worker is intentionally opt-in and must never run in production.
   agentWorkerEnabled: process.env.AGENT_WORKER_ENABLED === 'true' && !isProduction,

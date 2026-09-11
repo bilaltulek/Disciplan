@@ -91,6 +91,22 @@ describe('runtime-scoped configuration secrets', () => {
     expect(result.stdout).toMatch(/preview,proj_previewonly$/);
   });
 
+  it('allows both generated and stable branch origins in Vercel Preview', () => {
+    const result = runConfigProbe("process.stdout.write('CORS_ORIGINS:' + JSON.stringify(config.corsOrigins));", {
+      VERCEL_ENV: 'preview',
+      VERCEL_URL: 'disciplan-generated.example.vercel.app',
+      VERCEL_BRANCH_URL: 'disciplan-git-development-2.example.vercel.app',
+      CORS_ORIGINS: 'https://disciplan.vercel.app',
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout.match(/CORS_ORIGINS:(\[.*\])$/s)?.[1] || '[]')).toEqual([
+      'https://disciplan.vercel.app',
+      'https://disciplan-generated.example.vercel.app',
+      'https://disciplan-git-development-2.example.vercel.app',
+    ]);
+  });
+
   it('rejects Preview runtime scope in Vercel Production', () => {
     const result = runConfigProbe('void config.agentRuntimeScope;', {
       AGENT_RUNTIME_SCOPE: 'preview', AGENT_ROLLOUT_MODE: 'active',

@@ -41,15 +41,33 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   });
 
   const contentType = response.headers.get('content-type') || '';
-  const payload: unknown = contentType.includes('application/json') ? await response.json() : null;
+  let payload: unknown = null;
+  if (contentType.includes('application/json')) {
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !suppressAuthRedirect) {
       window.dispatchEvent(new Event('auth:unauthorized'));
     }
-    const message = typeof payload === 'object' && payload && 'error' in payload && typeof payload.error === 'string'
-      ? payload.error
-      : 'Request failed';
+    const serverMessage = typeof payload === 'object' && payload && 'error' in payload && typeof payload.error === 'string'
+      ? payload.error.trim()
+      : '';
+    const payloadRequestId = typeof payload === 'object' && payload && 'requestId' in payload && typeof payload.requestId === 'string'
+      ? payload.requestId
+      : '';
+    const responseRequestId = response.headers.get('x-request-id') || '';
+    const requestId = [payloadRequestId, responseRequestId]
+      .find((value) => /^[a-zA-Z0-9-]{8,128}$/.test(value));
+    const fallback = response.status >= 500
+      ? `The server could not complete this request (${response.status}).`
+      : `Request failed (${response.status}).`;
+    const reference = response.status >= 500 && requestId ? ` Reference: ${requestId}.` : '';
+    const message = `${serverMessage || fallback}${reference}`;
     throw new ApiError(message, response.status);
   }
 
