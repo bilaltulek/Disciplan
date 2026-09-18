@@ -392,7 +392,7 @@ export const normalizeAssistantDecision = (state: DisciplanState, decision: Inte
     return withIntent('break_down_task', 'answer', { missingFields: [] });
   }
 
-  const explicitlySchedules = /\b(create|add|make|publish|schedule)\b/i.test(message)
+  const explicitlySchedules = /\b(create|add|make|plan|publish|schedule)\b/i.test(message)
     && /\b(schedule|scheduled|assignment|calendar|plan)\b/i.test(message);
   const dateExpression = '(?:today|tomorrow|(?:next\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[\\/-]\\d{1,2}(?:[\\/-]\\d{2,4})?)';
   const messageContainsDueDate = new RegExp(

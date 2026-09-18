@@ -123,6 +123,10 @@ describe('specialist tool allowlists', () => {
     }), { ...decision, contextDelta: { dueDate: '2099-02-01' } })).toMatchObject({ intent: 'clarify', missingFields: ['dueDate'] });
     expect(normalizeAssistantDecision(createInitialGraphState({
       runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+      userRequest: 'Plan my essay but I have not said when it is due.',
+    }), decision)).toMatchObject({ intent: 'clarify', missingFields: ['dueDate'] });
+    expect(normalizeAssistantDecision(createInitialGraphState({
+      runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
       userRequest: 'Create a study plan. Due date: 2099-02-01.',
     }), {
       ...decision, intent: 'publish_initial_plan', responseMode: 'plan',
