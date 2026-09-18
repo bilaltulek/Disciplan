@@ -1,5 +1,5 @@
 import {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useCallback, useEffect, useMemo, useState,
 } from 'react';
 import DashboardNav from '@/components/layout/DashboardNav';
 import { Card } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  ArrowUpDown, Filter, Loader2, Plus, Undo2,
+  ArrowUpDown, Filter, Loader2, Plus,
 } from 'lucide-react';
 import TaskCard from '@/components/features/TaskCard';
 import { apiRequest } from '@/shared/api/client';
@@ -37,13 +37,11 @@ const errorMessage = (error: unknown, fallback: string) => error instanceof Erro
 export default function Dashboard() {
   const { settings } = useSettings();
   const [tasks, setTasks] = useState<AssignmentSummary[]>([]);
-  const [pendingDeletions, setPendingDeletions] = useState<Array<{ task: AssignmentSummary }>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [planWarning, setPlanWarning] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('All');
   const [sortBy, setSortBy] = useState<SortOption>('dueSoonest');
-  const deletionQueueRef = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const [formData, setFormData] = useState<AssignmentForm>({ title: '', description: '', complexity: settings.assignment_default_complexity, dueDate: '', totalItems: settings.assignment_default_items });
 
   useEffect(() => {
@@ -58,7 +56,6 @@ export default function Dashboard() {
 
   useEffect(() => { void fetchAssignments().catch(() => undefined); }, [fetchAssignments]);
   useActiveRunPolling(tasks, fetchAssignments);
-  useEffect(() => () => { deletionQueueRef.current.forEach((timeout) => clearTimeout(timeout)); deletionQueueRef.current.clear(); }, []);
 
   const visibleTasks = useMemo(() => {
     const filtered = tasks.filter((task) => difficultyFilter === 'All' || task.complexity === difficultyFilter);
@@ -80,20 +77,16 @@ export default function Dashboard() {
     } catch (error) { alert(errorMessage(error, 'Failed to create plan.')); } finally { setLoading(false); }
   };
   const restoreTaskToView = (task: AssignmentSummary) => setTasks((previous) => previous.some((entry) => entry.id === task.id) ? previous : [task, ...previous]);
-  const finalizeAssignmentDelete = async (task: AssignmentSummary) => {
-    try { await apiRequest(`/api/assignments/${task.id}`, { method: 'DELETE', headers: {} }); setPendingDeletions((previous) => previous.filter((item) => item.task.id !== task.id)); deletionQueueRef.current.delete(task.id); }
-    catch (error) { setPendingDeletions((previous) => previous.filter((item) => item.task.id !== task.id)); deletionQueueRef.current.delete(task.id); restoreTaskToView(task); alert(errorMessage(error, 'Failed to delete assignment.')); }
-  };
-  const handleDeleteAssignment = (task: AssignmentSummary) => {
-    if (deletionQueueRef.current.has(task.id) || (settings.confirm_assignment_delete && !window.confirm('Delete this assignment? You can still undo within 5 seconds.'))) return;
+  const handleDeleteAssignment = async (task: AssignmentSummary) => {
+    if (settings.confirm_assignment_delete
+      && !window.confirm(`Delete "${task.title}" and all of its Timeline and History tasks? This permanently removes their task count and recorded study time.`)) return;
     setTasks((previous) => previous.filter((entry) => entry.id !== task.id));
-    deletionQueueRef.current.set(task.id, setTimeout(() => { void finalizeAssignmentDelete(task); }, 5000));
-    setPendingDeletions((previous) => [...previous, { task }]);
-  };
-  const handleUndoDeletion = (taskId: number) => {
-    const timeout = deletionQueueRef.current.get(taskId); if (timeout) clearTimeout(timeout); deletionQueueRef.current.delete(taskId);
-    const pending = pendingDeletions.find((item) => item.task.id === taskId); if (pending) restoreTaskToView(pending.task);
-    setPendingDeletions((previous) => previous.filter((item) => item.task.id !== taskId));
+    try {
+      await apiRequest(`/api/assignments/${task.id}`, { method: 'DELETE', headers: {} });
+    } catch (error) {
+      restoreTaskToView(task);
+      alert(errorMessage(error, 'Failed to delete assignment.'));
+    }
   };
   const handleRunAction = async (runId: string, action: 'retry' | 'cancel') => {
     try { await apiRequest(`/api/agent-runs/${runId}/${action}`, { method: 'POST', headers: {} }); await fetchAssignments(); }
@@ -113,17 +106,6 @@ export default function Dashboard() {
           <div className="app-notice app-notice-warning">
             <p className="text-sm">{planWarning}</p>
             <button type="button" onClick={() => setPlanWarning('')} className="min-h-10 shrink-0 text-xs font-medium underline underline-offset-4">Dismiss</button>
-          </div>
-        )}
-
-        {pendingDeletions.length > 0 && (
-          <div className="mb-5 space-y-2">
-            {pendingDeletions.map(({ task }) => (
-              <div key={task.id} className="app-notice">
-                <p className="text-sm"><span className="font-semibold">{task.title}</span> will be deleted in 5 seconds.</p>
-                <Button type="button" variant="outline" onClick={() => handleUndoDeletion(task.id)}><Undo2 className="mr-2 h-4 w-4" />Undo</Button>
-              </div>
-            ))}
           </div>
         )}
 
@@ -172,7 +154,7 @@ export default function Dashboard() {
           </Dialog>
 
           {visibleTasks.map((task) => (
-            <TaskCard key={task.id} task={task} onDeleteAssignment={handleDeleteAssignment} onRetryRun={(runId) => void handleRunAction(runId, 'retry')} onCancelRun={(runId) => void handleRunAction(runId, 'cancel')} />
+            <TaskCard key={task.id} task={task} onDeleteAssignment={(assignment) => void handleDeleteAssignment(assignment)} onRetryRun={(runId) => void handleRunAction(runId, 'retry')} onCancelRun={(runId) => void handleRunAction(runId, 'cancel')} />
           ))}
         </div>
 

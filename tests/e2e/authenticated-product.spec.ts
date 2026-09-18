@@ -99,7 +99,7 @@ test('authenticated product reflows at 200% text size and honors reduced motion'
   await page.getByRole('link', { name: 'Timeline' }).click();
   await expect(page.getByRole('heading', { name: /Today/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  expect(await page.locator('.timeline-depth-layer').first().evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
+  expect(await page.locator('.timeline-week-day').first().evaluate((element) => getComputedStyle(element).transitionDuration)).toBe('0s');
 });
 
 test('Dashboard creates an assignment and preserves semantic filtering controls', async ({ page }) => {
@@ -157,6 +157,57 @@ test('Dashboard creates an assignment and preserves semantic filtering controls'
   await expect(page.locator('.difficulty-hard')).toHaveText('Hard');
 });
 
+test('Dashboard deletion persists immediately and removes assignment work from Timeline and History totals', async ({ page }) => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  let deleted = false;
+  const assignment = {
+    id: 18, title: 'Statistics review', description: '', complexity: 'Medium', due_date: today,
+    total_items: 2, total_subtasks: 2, completed_subtasks: 1, plan_generation_status: 'succeeded',
+  };
+  const tasks = [
+    {
+      id: 61, assignment_id: 18, task_description: 'Review distributions', assignment_title: 'Statistics review',
+      complexity: 'Medium', scheduled_date: today, estimated_minutes: 40, actual_minutes: 50,
+      completed: true, completed_at: new Date().toISOString(),
+    },
+    {
+      id: 62, assignment_id: 18, task_description: 'Complete practice set', assignment_title: 'Statistics review',
+      complexity: 'Medium', scheduled_date: today, estimated_minutes: 30, actual_minutes: null, completed: false,
+    },
+  ];
+
+  await installAuthAndSettings(page, async (route, url) => {
+    const method = route.request().method();
+    if (url.pathname === '/api/assignments' && method === 'GET') return handled(route, deleted ? [] : [assignment]);
+    if (url.pathname === '/api/assignments/18' && method === 'DELETE') {
+      deleted = true;
+      return handled(route, { message: 'Assignment deleted.', assignmentId: 18, deletedTaskCount: 2 });
+    }
+    if (url.pathname === '/api/timeline' && method === 'GET') return handled(route, deleted ? [] : tasks);
+    if (url.pathname === '/api/history' && method === 'GET') return handled(route, deleted ? [] : [tasks[0]]);
+    return undefined;
+  });
+
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: 'Statistics review' })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete assignment Statistics review' }).click();
+  await expect.poll(() => deleted).toBe(true);
+  await expect(page.getByRole('heading', { name: 'Statistics review' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Timeline' }).click();
+  await expect(page.getByLabel('Today summary')).toContainText('0 tasks');
+  await expect(page.getByText('Review distributions')).toHaveCount(0);
+  await expect(page.getByText('Complete practice set')).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'History' }).click();
+  const summary = page.getByLabel('Completion summary');
+  await expect(summary).toContainText('Tasks completed0');
+  await expect(summary).toContainText('Study time0 hours');
+  await expect(page.getByText('0 of 0 completed tasks')).toBeVisible();
+});
+
 test('History filters, edits, and deletes completed work without changing its behavior', async ({ page }) => {
   let deleted = false;
   let task = {
@@ -210,10 +261,13 @@ test('History filters, edits, and deletes completed work without changing its be
 });
 
 test('Timeline navigates days and preserves task edit, completion, deletion, and filtering flows', async ({ page }) => {
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrowDate = new Date(`${today}T12:00:00`);
+  const toDateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const todayDate = new Date();
+  const today = toDateKey(todayDate);
+  const tomorrowDate = new Date(todayDate);
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = tomorrowDate.toISOString().split('T')[0];
+  const tomorrow = toDateKey(tomorrowDate);
+  const tomorrowLabel = tomorrowDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   let tasks = [
     { id: 50, assignment_id: 14, task_description: 'Read process notes', assignment_title: 'Operating Systems lab', complexity: 'Hard', scheduled_date: today, estimated_minutes: 40, completed: false },
     { id: 51, assignment_id: 14, task_description: 'Trace process calls', assignment_title: 'Operating Systems lab', complexity: 'Hard', scheduled_date: tomorrow, estimated_minutes: 45, completed: false },
@@ -222,6 +276,23 @@ test('Timeline navigates days and preserves task edit, completion, deletion, and
   await installAuthAndSettings(page, async (route, url) => {
     const method = route.request().method();
     if (url.pathname === '/api/timeline' && method === 'GET') return handled(route, tasks);
+    if (url.pathname === '/api/assignments' && method === 'GET') return handled(route, [
+      {
+        id: 14, title: 'Operating Systems lab', description: '', complexity: 'Hard', due_date: tomorrow,
+        total_items: 2, total_subtasks: tasks.filter((task) => task.assignment_id === 14).length,
+        completed_subtasks: tasks.filter((task) => task.assignment_id === 14 && task.completed).length,
+        plan_generation_status: 'succeeded',
+      },
+      {
+        id: 15, title: 'Calculus midterm', description: '', complexity: 'Medium', due_date: tomorrow,
+        total_items: 1, total_subtasks: tasks.filter((task) => task.assignment_id === 15).length,
+        completed_subtasks: tasks.filter((task) => task.assignment_id === 15 && task.completed).length,
+        plan_generation_status: 'succeeded',
+      },
+    ]);
+    if (url.pathname === '/api/history' && method === 'GET') return handled(route, tasks
+      .filter((task) => task.completed)
+      .map((task) => ({ ...task, completed_at: new Date().toISOString() })));
     if (url.pathname === '/api/tasks/51' && method === 'PATCH') {
       expect(route.request().postDataJSON()).toMatchObject({ task_description: 'Trace fork and exec calls', estimated_minutes: 50, completed: false });
       tasks = tasks.map((task) => task.id === 51 ? { ...task, task_description: 'Trace fork and exec calls', estimated_minutes: 50 } : task);
@@ -242,23 +313,80 @@ test('Timeline navigates days and preserves task edit, completion, deletion, and
 
   await page.goto('/timeline');
   await expect(page.getByRole('heading', { name: /Today/ })).toBeVisible();
-  await page.getByRole('button', { name: 'Next Day' }).click();
+  await expect(page.getByRole('button', { name: 'Next Day' })).toHaveCount(0);
+  await expect(page.locator('.timeline-depth-layer')).toHaveCount(0);
+  await page.getByRole('button', { name: `Go to ${tomorrowLabel}` }).click();
+  await expect(page.locator(`#timeline-day-${tomorrow}`)).toBeFocused();
   await expect(page.getByText('Trace process calls')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Edit task' }).first().click();
+  await page.getByRole('button', { name: 'Edit Trace process calls' }).click();
   await page.getByLabel('Task Description').fill('Trace fork and exec calls');
   await page.getByLabel('Minutes').fill('50');
   await page.getByRole('button', { name: 'Save Changes' }).click();
   await expect(page.getByText('Trace fork and exec calls')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Delete task' }).last().click();
+  await page.getByRole('button', { name: 'Delete Review derivative rules' }).click();
   await expect(page.getByText('Review derivative rules')).toBeHidden();
-  await page.getByRole('checkbox', { name: 'Mark task complete' }).check();
-  await expect(page.getByRole('checkbox', { name: 'Mark task incomplete' })).toBeChecked();
-  const hideCompleted = page.getByRole('button', { name: 'Hide Completed' });
+  await page.getByRole('checkbox', { name: 'Mark Trace fork and exec calls complete' }).check();
+  await expect(page.getByRole('checkbox', { name: 'Mark Trace fork and exec calls incomplete' })).toBeChecked();
+  const hideCompleted = page.getByRole('button', { name: 'Hide completed' });
   await hideCompleted.click();
-  await expect(page.getByRole('button', { name: 'Showing Incomplete Only' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Show completed' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('Trace fork and exec calls')).toBeHidden();
+
+  await page.getByRole('link', { name: 'History' }).click();
+  await expect(page.getByRole('heading', { name: 'Trace fork and exec calls' })).toBeVisible();
+  await page.getByRole('link', { name: 'Dashboard' }).click();
+  await expect(page.getByRole('progressbar', { name: 'Operating Systems lab progress' })).toHaveAttribute('aria-valuenow', '50');
+});
+
+test('Timeline agenda remains usable across supported widths and themes', async ({ page }) => {
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  let themeMode = 'light';
+  await page.route('**/api/**', async (route) => {
+    const url = new URL(route.request().url());
+    if (!url.pathname.startsWith('/api/')) return route.continue();
+    if (url.pathname === '/api/me') return fulfill(route, { user: { id: 7, email: 'student@example.invalid', name: 'Student' } });
+    if (url.pathname === '/api/settings' && route.request().method() === 'GET') return fulfill(route, { settings: {
+      theme_mode: themeMode, start_page: 'timeline', assignment_default_complexity: 'Medium',
+      assignment_default_items: 5, confirm_assignment_delete: true,
+    } });
+    if (url.pathname === '/api/timeline') return fulfill(route, [{
+      id: 80, assignment_id: 24, task_description: 'Review responsive agenda', assignment_title: 'Interface design',
+      complexity: 'Medium', scheduled_date: today, estimated_minutes: 45, completed: false,
+    }]);
+    if (url.pathname === '/api/assignments') return fulfill(route, [{
+      id: 24, title: 'Interface design', description: '', complexity: 'Medium', due_date: today,
+      total_items: 1, total_subtasks: 1, completed_subtasks: 0, plan_generation_status: 'succeeded',
+    }]);
+    return fulfill(route, { error: `Unhandled test route: ${url.pathname}` }, 500);
+  });
+
+  await page.goto('/timeline');
+  await expect(page.getByText('Review responsive agenda')).toBeVisible();
+  for (const width of [1440, 1024, 820, 390, 360]) {
+    await page.setViewportSize({ width, height: width <= 390 ? 800 : 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByRole('navigation', { name: 'Upcoming seven days' })).toBeVisible();
+  }
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  for (const label of ['Edit Review responsive agenda', 'Delete Review responsive agenda']) {
+    const bounds = await page.getByRole('button', { name: label }).evaluate((element) => element.getBoundingClientRect());
+    expect(bounds.width).toBeGreaterThanOrEqual(44);
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+  }
+  const toggleBounds = await page.getByRole('checkbox', { name: 'Mark Review responsive agenda complete' })
+    .locator('..').evaluate((element) => element.getBoundingClientRect());
+  expect(toggleBounds.width).toBeGreaterThanOrEqual(44);
+  expect(toggleBounds.height).toBeGreaterThanOrEqual(44);
+
+  themeMode = 'dark';
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await expect(page.getByText('Review responsive agenda')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('Profile keeps its existing update flow inside the redesigned account surface', async ({ page }) => {

@@ -135,5 +135,39 @@ describe.skipIf(!enabled)('HTTP security and ownership with Postgres', () => {
       [first.body.assignment.id],
     );
     expect(feedbackRows.rows[0].count).toBe(1);
+
+    const assignmentTasks = await pool.query(
+      'SELECT id FROM study_tasks WHERE assignment_id=$1 ORDER BY id',
+      [first.body.assignment.id],
+    );
+    expect(assignmentTasks.rowCount).toBeGreaterThan(0);
+    await pool.query(
+      `UPDATE study_tasks SET completed=TRUE,completed_at=CURRENT_TIMESTAMP,actual_minutes=47
+       WHERE id=$1`,
+      [assignmentTasks.rows[0].id],
+    );
+
+    const deleted = await request(app)
+      .delete(`/api/assignments/${first.body.assignment.id}`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body).toMatchObject({
+      assignmentId: first.body.assignment.id,
+      deletedTaskCount: assignmentTasks.rowCount,
+    });
+    expect((await pool.query('SELECT 1 FROM assignments WHERE id=$1', [first.body.assignment.id])).rowCount).toBe(0);
+    expect((await pool.query('SELECT 1 FROM study_tasks WHERE assignment_id=$1', [first.body.assignment.id])).rowCount).toBe(0);
+    expect((await pool.query('SELECT 1 FROM plan_feedback WHERE assignment_id=$1', [first.body.assignment.id])).rowCount).toBe(0);
+
+    const timelineAfterDelete = await request(app)
+      .get('/api/timeline')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const historyAfterDelete = await request(app)
+      .get('/api/history')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    expect(timelineAfterDelete.status).toBe(200);
+    expect(historyAfterDelete.status).toBe(200);
+    expect(timelineAfterDelete.body.some((task: any) => task.assignment_id === first.body.assignment.id)).toBe(false);
+    expect(historyAfterDelete.body.some((task: any) => task.assignment_id === first.body.assignment.id)).toBe(false);
   });
 });
