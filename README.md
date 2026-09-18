@@ -144,9 +144,19 @@ Provider controls remain hidden unless the shared WorkOS configuration and the
 individual provider flag are complete. Configure Microsoft's WorkOS social
 connection for both personal and work/school accounts. Enterprise SSO uses
 AuthKit discovery and accepts only SSO authentication from configured WorkOS
-organization connections. Production activation additionally requires an
-owned verified domain, exact provider redirect configuration, approved public
-Terms and Privacy documents, and accepted WorkOS production configuration.
+organization connections. Production activation requires separate Production
+credentials, billing activation, an exact HTTPS provider redirect, approved
+public Terms and Privacy documents, and accepted WorkOS production
+configuration. A custom AuthKit domain is optional; verified organization
+domains and live connections are required only when enterprise SSO is enabled.
+
+The canonical Production callback is:
+
+```text
+https://disciplan.vercel.app/api/auth/callback
+```
+
+Do not reuse a Preview callback or WorkOS Staging credentials in Production.
 
 ## 🧪 Scripts
 
