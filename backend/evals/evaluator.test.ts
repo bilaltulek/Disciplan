@@ -52,6 +52,7 @@ describe('agent evaluation release gates', () => {
 
   it('reports only stable sanitized provider failure codes', () => {
     expect(classifyEvaluationFailure({ status: 404, message: 'sensitive provider detail' })).toBe('MODEL_NOT_FOUND');
+    expect(classifyEvaluationFailure({ statusCode: 402 })).toBe('MODEL_PAYMENT_REQUIRED');
     expect(classifyEvaluationFailure({ statusCode: 429 })).toBe('MODEL_QUOTA_EXCEEDED');
     expect(classifyEvaluationFailure({ cause: { status: 503 } })).toBe('MODEL_PROVIDER_UNAVAILABLE');
     expect(classifyEvaluationFailure({ code: 'EVAL_COST_LIMIT' })).toBe('EVAL_COST_LIMIT');

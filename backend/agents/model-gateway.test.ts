@@ -29,6 +29,7 @@ describe('Gemini failure classification', () => {
   it.each([
     [{ name: 'PromptBlockedError' }, 'MODEL_SAFETY_BLOCK'],
     [{ name: 'RequestError', statusCode: 429 }, 'MODEL_QUOTA_EXCEEDED'],
+    [{ name: 'RequestError', statusCode: 402 }, 'MODEL_PAYMENT_REQUIRED'],
     [{ name: 'RequestError', statusCode: 504 }, 'MODEL_TIMEOUT'],
     [{ name: 'RequestError', statusCode: 404 }, 'MODEL_NOT_FOUND'],
     [{ name: 'RequestError', statusCode: 400 }, 'MODEL_REQUEST_INVALID'],

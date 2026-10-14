@@ -53,6 +53,8 @@ export const normalizeGoogleModelError = (error: unknown): Error & { code: strin
       ? 'MODEL_STRUCTURE_INVALID'
       : names.has('AbortError') || statusCode === 408 || statusCode === 504
         ? 'MODEL_TIMEOUT'
+        : statusCode === 402
+          ? 'MODEL_PAYMENT_REQUIRED'
         : statusCode === 429
           ? 'MODEL_QUOTA_EXCEEDED'
           : statusCode === 401 || statusCode === 403

@@ -29,6 +29,7 @@ export const classifyEvaluationFailure = (error: unknown): string => {
     : {};
   const status = Number(value.status ?? value.statusCode ?? cause.status ?? cause.statusCode ?? 0);
   if (status === 401 || status === 403) return 'MODEL_AUTHENTICATION_FAILED';
+  if (status === 402) return 'MODEL_PAYMENT_REQUIRED';
   if (status === 404) return 'MODEL_NOT_FOUND';
   if (status === 408 || status === 504) return 'MODEL_TIMEOUT';
   if (status === 429) return 'MODEL_QUOTA_EXCEEDED';
