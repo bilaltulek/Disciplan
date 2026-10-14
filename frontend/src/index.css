@@ -1,4 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Keep application rules unlayered so their selectors retain precedence over Tailwind utilities. */
 
 @font-face {
   font-family: 'Geist App';
@@ -8,11 +13,6 @@
   font-display: swap;
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
   :root {
     --background: 218 55% 95%;
     --foreground: 220 33% 15%;
@@ -138,9 +138,7 @@
     --app-hard-text: 0 34% 69%;
     color-scheme: dark;
   }
-}
  
-@layer base {
   * {
     @apply border-border/70;
   }
@@ -195,9 +193,7 @@
   ::selection {
     background: hsl(var(--primary) / 0.25);
   }
-}
 
-@layer components {
   .page-shell {
     @apply min-h-screen text-foreground;
   }
@@ -2032,7 +2028,6 @@
     gap: 2rem;
     margin-top: 2rem;
   }
-}
 
 @layer utilities {
   .text-balance {

@@ -341,11 +341,11 @@ function getAssignmentTasks({ title, description, complexity = 'Medium' }: any) 
 function getTasks(subject: any, complexity: any) {
   const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_');
   const templates = taskTemplates as Record<string, Record<string, string[]>>;
-  
+
   if (templates[normalizedSubject] && templates[normalizedSubject][complexity]) {
     return templates[normalizedSubject][complexity];
   }
-  
+
   return templates.generic[complexity];
 }
 
@@ -353,10 +353,10 @@ function getTasks(subject: any, complexity: any) {
 function getEstimatedDuration(subject: any, complexity: any) {
   const normalizedSubject = subject.toLowerCase().replace(/\s+/g, '_');
   const estimates = durationEstimates as Record<string, Record<string, number[]>>;
-  
+
   const durations = estimates[normalizedSubject] || estimates.generic;
   const options = durations[complexity];
-  
+
   return options[Math.floor(options.length / 2)];
 }
 
