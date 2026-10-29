@@ -75,7 +75,7 @@ try {
   delete environment.TEST_DATABASE_URL;
   delete environment.TRIGGER_SECRET_KEY;
   run('npx', [
-    'trigger.dev@4.5.13', 'deploy', '--project-ref', projectRef,
+    'trigger.dev@4.8.2', 'deploy', '--project-ref', projectRef,
     '--env', 'prod', '--skip-update-check',
   ], { env: environment });
 } finally {

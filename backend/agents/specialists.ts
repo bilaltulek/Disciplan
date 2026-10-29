@@ -392,6 +392,12 @@ export const normalizeAssistantDecision = (state: DisciplanState, decision: Inte
     return withIntent('break_down_task', 'answer', { missingFields: [] });
   }
 
+  // Exploring a possible plan does not create scheduled work or require a due date.
+  if (/\b(sketch|draft approach|what might .+ plan|propose a plan|only exploring)\b/i.test(message)
+      && !/\b(schedule it|add .*calendar|publish .*plan|create tasks)\b/i.test(message)) {
+    return withIntent('draft_plan', 'answer', { missingFields: [], clarificationQuestion: undefined });
+  }
+
   const explicitlySchedules = /\b(create|add|make|plan|publish|schedule)\b/i.test(message)
     && /\b(schedule|scheduled|assignment|calendar|plan)\b/i.test(message);
   const dateExpression = '(?:today|tomorrow|(?:next\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[\\/-]\\d{1,2}(?:[\\/-]\\d{2,4})?)';

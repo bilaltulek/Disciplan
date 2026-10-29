@@ -125,6 +125,18 @@ describe('specialist tool allowlists', () => {
       runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
       userRequest: 'Plan my essay but I have not said when it is due.',
     }), decision)).toMatchObject({ intent: 'clarify', missingFields: ['dueDate'] });
+    for (const userRequest of [
+      'Sketch a possible study plan for my biology exam; I am only exploring.',
+      'Propose a plan for learning C memory management without creating tasks.',
+      'What might a calculus review plan look like?',
+    ]) {
+      expect(normalizeAssistantDecision(createInitialGraphState({
+        runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
+        userRequest,
+      }), { ...decision, intent: 'clarify', missingFields: ['dueDate'], responseMode: 'question' })).toMatchObject({
+        intent: 'draft_plan', missingFields: [], responseMode: 'answer',
+      });
+    }
     expect(normalizeAssistantDecision(createInitialGraphState({
       runId: state.runId, actorUserId: 42, runType: 'conversation', triggerType: 'user_message',
       userRequest: 'Create a study plan. Due date: 2099-02-01.',

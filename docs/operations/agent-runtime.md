@@ -60,7 +60,7 @@ Runtime secret scope:
   `TRIGGER_PROJECT_REF`, active rollout, Preview runtime/data markers, and AI
   limits. Never provide the API JWT or migration credential.
 - Trigger Development: the same values may be used for local task testing with
-  a Development key and `npx trigger.dev@4.5.14 dev`.
+  a Development key and `npx trigger.dev@4.8.2 dev`.
 - Migration workstation/CI only: direct `MIGRATION_DATABASE_URL`.
 
 ## Incident controls

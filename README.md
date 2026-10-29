@@ -291,7 +291,7 @@ npm run migrate
 - Do not put `MIGRATION_DATABASE_URL` in Vercel.
 - Trigger.dev project `proj_tepkfgmarlbrlywqkcao` is bound in
   `trigger.config.ts`. Free-plan validation uses Trigger Development only;
-  start it with `npx trigger.dev@4.5.13 dev` and do not run a Trigger deploy.
+  start it with `npx trigger.dev@4.8.2 dev` and do not run a Trigger deploy.
   Configure the local Development runtime with
   `DATABASE_URL`, `AGENT_DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, AI
   budget controls, and `AGENT_ROLLOUT_MODE=off`. It does not need `JWT_SECRET`
@@ -323,7 +323,7 @@ agent execution uses Trigger.dev.
 
 Read the step-by-step [Docker guide](docs/docker-guide.md) before running it.
 See the [agent runtime runbook](docs/operations/agent-runtime.md) for deployment,
-reconciliation, retention, incident controls, and the known dependency advisory.
+reconciliation, retention, incident controls, and the dependency audit policy.
 
 ## 🤝 Contributing
 
