@@ -1,0 +1,10 @@
+import { describe, expect, it } from 'vitest';
+
+const { checksum } = require('./migrate');
+
+describe('migration runner', () => {
+  it('uses stable checksums to detect edited applied migrations', () => {
+    expect(checksum('SELECT 1;')).toBe(checksum('SELECT 1;'));
+    expect(checksum('SELECT 1;')).not.toBe(checksum('SELECT 2;'));
+  });
+});
