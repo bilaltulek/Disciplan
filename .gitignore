@@ -22,12 +22,27 @@ playwright-report/
 *.db
 *.sqlite
 backend/scripts/*.csv
+docs/
 
-# Private implementation planning and operational handoff evidence. Durable
-# developer documentation belongs under docs/ instead.
+# Local documentation and implementation notes.
 .agent/
 HANDOFF.md
 AGENTS.md
+*.private.md
+notes/
+scratch/
+
+# Local editor files and review captures.
+.idea/
+.vscode/
+*.local
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+backend/curl-*.sh
+frontend/dist-ssr/
 
 .DS_Store
 Thumbs.db

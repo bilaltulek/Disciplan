@@ -27,7 +27,6 @@ Dockerfile.*
 compose.yaml
 docker/
 playwright.config.ts
-tsconfig.worker.json
 vitest.config.ts
 
 # Test, evaluation, and local validation sources are not required by the

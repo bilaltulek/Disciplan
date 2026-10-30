@@ -1,7 +1,8 @@
 import {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useEffect, useMemo, useRef, useState,
 } from 'react';
 import DashboardNav from '@/components/layout/DashboardNav';
+import './timeline/timeline.css';
 import {
   Check, ListFilter, Loader2, Pencil, Trash2,
 } from 'lucide-react';
@@ -11,138 +12,18 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import { apiRequest } from '@/shared/api/client';
-import type { AssignmentSummary, ScheduledTask } from '@/shared/api/types';
-
-interface TimelineEditForm {
-  task_description: string;
-  scheduled_date: string;
-  estimated_minutes: string;
-}
-
-interface TimelineDay {
-  date: string;
-  tasks: ScheduledTask[];
-  isToday: boolean;
-  isPast: boolean;
-}
-
-interface AssignmentGroup {
-  assignmentId: number;
-  title: string;
-  complexity: ScheduledTask['complexity'];
-  tasks: ScheduledTask[];
-}
-
-const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
-
-const parseDateKey = (dateKey: string) => {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day, 12);
-};
-
-const toDateKey = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const getToday = () => toDateKey(new Date());
-
-const addDays = (dateKey: string, amount: number) => {
-  const date = parseDateKey(dateKey);
-  date.setDate(date.getDate() + amount);
-  return toDateKey(date);
-};
-
-const formatFullDate = (dateKey: string) => parseDateKey(dateKey).toLocaleDateString('en-US', {
-  weekday: 'long', month: 'long', day: 'numeric',
-});
-
-const formatShortDate = (dateKey: string) => parseDateKey(dateKey).toLocaleDateString('en-US', {
-  month: 'short', day: 'numeric',
-});
-
-const formatDayHeading = (dateKey: string, today: string, tomorrow: string) => {
-  if (dateKey === today) return 'Today';
-  const dateLabel = parseDateKey(dateKey).toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric',
-  });
-  return dateKey === tomorrow ? `Tomorrow · ${dateLabel}` : dateLabel;
-};
-
-const formatMinutes = (minutes: number) => {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainder = minutes % 60;
-  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
-};
-
-const taskCountLabel = (count: number) => `${count} ${count === 1 ? 'task' : 'tasks'}`;
-
-const groupTasksByAssignment = (tasks: ScheduledTask[]) => {
-  const groups = new Map<number, AssignmentGroup>();
-  tasks.forEach((task) => {
-    const existing = groups.get(task.assignment_id);
-    if (existing) {
-      existing.tasks.push(task);
-      return;
-    }
-    groups.set(task.assignment_id, {
-      assignmentId: task.assignment_id,
-      title: task.assignment_title,
-      complexity: task.complexity,
-      tasks: [task],
-    });
-  });
-  return [...groups.values()];
-};
+import { useTimelineTasks } from './timeline/useTimelineTasks';
+import { buildTimelineDays, formatDayHeading, formatFullDate, formatMinutes, formatShortDate, getToday, groupTasksByAssignment, parseDateKey, taskCountLabel, type TimelineDay } from './timeline/model';
 
 const Timeline = () => {
-  const [rawTasks, setRawTasks] = useState<ScheduledTask[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [timelineError, setTimelineError] = useState('');
-  const [metadataWarning, setMetadataWarning] = useState('');
+  const {
+    rawTasks, assignments, loading, timelineError, metadataWarning, editTask, setEditTask,
+    editForm, setEditForm, saving, togglingId, deletingId, fetchTimeline,
+    handleToggle, openEdit, handleSaveEdit, handleDelete,
+  } = useTimelineTasks();
   const [today, setToday] = useState(getToday());
-  const [editTask, setEditTask] = useState<ScheduledTask | null>(null);
-  const [editForm, setEditForm] = useState<TimelineEditForm>({ task_description: '', scheduled_date: '', estimated_minutes: '' });
-  const [saving, setSaving] = useState(false);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [hideCompleted, setHideCompleted] = useState(false);
   const sectionRefs = useRef(new Map<string, HTMLElement>());
-
-  const fetchTimeline = useCallback(async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setTimelineError('');
-    const [timelineResult, assignmentsResult] = await Promise.allSettled([
-      apiRequest<ScheduledTask[]>('/api/timeline', { method: 'GET', headers: {} }),
-      apiRequest<AssignmentSummary[]>('/api/assignments', { method: 'GET', headers: {} }),
-    ]);
-
-    if (timelineResult.status === 'fulfilled') {
-      setRawTasks(timelineResult.value);
-    } else {
-      console.error('Failed to load timeline', timelineResult.reason);
-      setTimelineError(errorMessage(timelineResult.reason, 'Timeline could not be loaded.'));
-    }
-
-    if (assignmentsResult.status === 'fulfilled') {
-      setAssignments(assignmentsResult.value);
-      setMetadataWarning('');
-    } else {
-      console.error('Failed to load assignment details', assignmentsResult.reason);
-      setAssignments([]);
-      setMetadataWarning('Some assignment details are temporarily unavailable. Tasks are still ready to use.');
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void fetchTimeline();
-  }, [fetchTimeline]);
 
   useEffect(() => {
     const now = new Date();
@@ -152,38 +33,10 @@ const Timeline = () => {
     return () => window.clearTimeout(timer);
   }, [today]);
 
-  const tomorrow = addDays(today, 1);
-  const weekDates = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(today, index)), [today]);
-  const weekEnd = weekDates[weekDates.length - 1];
-  const tasksByDate = useMemo(() => {
-    const grouped = new Map<string, ScheduledTask[]>();
-    rawTasks.forEach((task) => grouped.set(task.scheduled_date, [...(grouped.get(task.scheduled_date) || []), task]));
-    return grouped;
-  }, [rawTasks]);
+  const { tomorrow, weekDates, tasksByDate, upcomingDays, pastDays } = useMemo(
+    () => buildTimelineDays(rawTasks, today), [rawTasks, today],
+  );
   const assignmentById = useMemo(() => new Map(assignments.map((assignment) => [assignment.id, assignment])), [assignments]);
-
-  const upcomingDays = useMemo(() => {
-    const laterTaskDates = [...new Set(rawTasks
-      .map((task) => task.scheduled_date)
-      .filter((dateKey) => dateKey > weekEnd))].sort();
-    return [...weekDates, ...laterTaskDates].map<TimelineDay>((dateKey) => ({
-      date: dateKey,
-      tasks: tasksByDate.get(dateKey) || [],
-      isToday: dateKey === today,
-      isPast: false,
-    }));
-  }, [rawTasks, tasksByDate, today, tomorrow, weekDates, weekEnd]);
-
-  const pastDays = useMemo(() => [...new Set(rawTasks
-    .map((task) => task.scheduled_date)
-    .filter((dateKey) => dateKey < today))]
-    .sort((left, right) => right.localeCompare(left))
-    .map<TimelineDay>((dateKey) => ({
-      date: dateKey,
-      tasks: tasksByDate.get(dateKey) || [],
-      isToday: false,
-      isPast: true,
-    })), [rawTasks, tasksByDate, today]);
 
   const todayTasks = tasksByDate.get(today) || [];
   const todayCompleted = todayTasks.filter((task) => task.completed).length;
@@ -198,94 +51,6 @@ const Timeline = () => {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     section.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
     section.focus({ preventScroll: true });
-  };
-
-  const handleToggle = async (taskId: number, currentStatus: boolean) => {
-    if (togglingId !== null) return;
-    const previousTasks = rawTasks;
-    const previousAssignments = assignments;
-    const task = rawTasks.find((entry) => entry.id === taskId);
-    setRawTasks((current) => current.map((entry) => (
-      entry.id === taskId ? { ...entry, completed: !currentStatus } : entry
-    )));
-    if (task) {
-      setAssignments((current) => current.map((assignment) => assignment.id === task.assignment_id ? {
-        ...assignment,
-        completed_subtasks: Math.min(
-          assignment.total_subtasks,
-          Math.max(0, assignment.completed_subtasks + (currentStatus ? -1 : 1)),
-        ),
-      } : assignment));
-    }
-    setTogglingId(taskId);
-
-    try {
-      await apiRequest(`/api/tasks/${taskId}/toggle`, {
-        method: 'PATCH',
-        body: JSON.stringify({ completed: !currentStatus }),
-      });
-    } catch (error) {
-      setRawTasks(previousTasks);
-      setAssignments(previousAssignments);
-      console.error('Failed to toggle task', error);
-      alert(errorMessage(error, 'Failed to update task completion.'));
-    } finally {
-      setTogglingId(null);
-    }
-  };
-
-  const openEdit = (task: ScheduledTask) => {
-    setEditTask(task);
-    setEditForm({
-      task_description: task.task_description,
-      scheduled_date: task.scheduled_date,
-      estimated_minutes: String(task.estimated_minutes || 30),
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editTask) return;
-    setSaving(true);
-    try {
-      await apiRequest(`/api/tasks/${editTask.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          task_description: editForm.task_description,
-          scheduled_date: editForm.scheduled_date,
-          estimated_minutes: Number.parseInt(editForm.estimated_minutes, 10),
-          completed: !!editTask.completed,
-        }),
-      });
-      setEditTask(null);
-      await fetchTimeline(false);
-    } catch (error) {
-      console.error('Failed to update task', error);
-      alert(errorMessage(error, 'Failed to update task.'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (taskId: number) => {
-    if (!window.confirm('Delete this timeline task permanently?')) return;
-    const task = rawTasks.find((entry) => entry.id === taskId);
-    setDeletingId(taskId);
-    try {
-      await apiRequest(`/api/tasks/${taskId}`, { method: 'DELETE', headers: {} });
-      setRawTasks((current) => current.filter((entry) => entry.id !== taskId));
-      if (task) {
-        setAssignments((current) => current.map((assignment) => assignment.id === task.assignment_id ? {
-          ...assignment,
-          total_subtasks: Math.max(0, assignment.total_subtasks - 1),
-          completed_subtasks: Math.max(0, assignment.completed_subtasks - (task.completed ? 1 : 0)),
-        } : assignment));
-      }
-    } catch (error) {
-      console.error('Failed to delete task', error);
-      alert(errorMessage(error, 'Failed to delete task.'));
-    } finally {
-      setDeletingId(null);
-    }
   };
 
   const renderDay = (day: TimelineDay) => {

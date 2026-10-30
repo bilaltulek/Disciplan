@@ -1,7 +1,10 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import crypto from 'node:crypto';
 import { Command } from '@langchain/langgraph';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
+import { acquireExecutionLock, appendRunEvent, classifyRunFailure, releaseExecutionLock, safeModelFailure } from './run-lifecycle.js';
+import { loadContext } from './run-context.js';
+import { persistGraphResult } from './run-result-store.js';
+export { classifyRunFailure } from './run-lifecycle.js';
 import { createInitialGraphState } from './graph-state.js';
 import { GeminiModelGateway } from './model-gateway.js';
 import { groundTutorResources } from './grounded-resources.js';
@@ -17,120 +20,9 @@ const config = require('../config.env');
 const budget = require('../ai-usage');
 const { validatePlan } = require('../plan-validator');
 const { todayInTimezone } = require('../domain/date-only');
-const { proposeMemory } = require('../preference-memories');
 const logger = require('../infrastructure/logger');
 
-const TRANSIENT_RUN_FAILURE_CODES = new Set([
-  '40001', '40P01', '53300', '57P01', '08000', '08003', '08006',
-  'ECONNRESET', 'ETIMEDOUT', 'MODEL_TIMEOUT', 'MODEL_UNAVAILABLE', 'TRIGGER_DISPATCH_FAILED',
-  'MODEL_QUOTA_EXCEEDED', 'AGENT_RUNTIME_FAILED',
-]);
-
-export const classifyRunFailure = (error: unknown, attemptNumber: number) => {
-  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : 'AGENT_RUNTIME_FAILED';
-  return { code, terminal: attemptNumber >= 3 || !TRANSIENT_RUN_FAILURE_CODES.has(code) };
-};
-
-type RunContextRow = {
-  id: string;
-  thread_id: string | null;
-  user_id: number;
-  assignment_id: number | null;
-  status: string;
-  run_type: 'initial_plan' | 'conversation' | 'repair' | 'health_scan';
-  trigger_type: 'assignment_form' | 'user_message' | 'user_request' | 'schedule_health';
-  graph_version: string;
-  prompt_bundle_version: string;
-  trigger_context: { conflicts?: string[]; shadow?: boolean; validationFault?: unknown } | null;
-  title: string | null;
-  description: string | null;
-  complexity: 'Easy' | 'Medium' | 'Hard' | null;
-  due_date: string | null;
-  total_items: number | null;
-  message_content: string | null;
-  timezone: string | null;
-  weekday_available_minutes: Record<number, number> | null;
-  max_daily_minutes: number | null;
-  preferred_session_minutes: number | null;
-  profile_version: number | null;
-  published_plan_version_id: string | null;
-  thread_summary: string | null;
-  summary_through_message_id: string | null;
-  thread_context: Record<string, unknown> | null;
-};
-
-const appendRunEvent = async (runId: string, eventType: string, step: string, detailCode: string, safeDetail: string) => {
-  await db.query(
-    `INSERT INTO agent_run_events (run_id, event_type, step, detail_code, safe_detail)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [runId, eventType, step, detailCode, safeDetail],
-  );
-};
-
-const loadContext = async (runId: string): Promise<RunContextRow | null> => {
-  const result = await db.query<RunContextRow>(
-    `SELECT r.*, a.title, a.description, a.complexity, a.due_date, a.total_items,
-            p.timezone, p.weekday_available_minutes, p.max_daily_minutes,
-            p.preferred_session_minutes, p.version AS profile_version,
-            m.content AS message_content,
-            published.id AS published_plan_version_id,
-            th.summary AS thread_summary,
-            th.summary_through_message_id,
-            th.context_state AS thread_context
-     FROM agent_runs r
-     LEFT JOIN assignments a ON a.id = r.assignment_id AND a.user_id = r.user_id
-     LEFT JOIN agent_messages m ON m.id = r.input_message_id AND m.user_id = r.user_id
-     LEFT JOIN user_planning_profiles p ON p.user_id = r.user_id
-     LEFT JOIN agent_threads th ON th.id = r.thread_id AND th.user_id = r.user_id
-     LEFT JOIN LATERAL (
-       SELECT id FROM plan_versions
-       WHERE assignment_id = r.assignment_id AND status = 'published'
-       LIMIT 1
-     ) published ON TRUE
-     WHERE r.id = $1`,
-    [runId],
-  );
-  return result.rows[0] ?? null;
-};
-
 export { fallbackDraft } from './fallback-planner.js';
-
-const safeModelFailure = (error: unknown) => {
-  const candidate = error as { name?: string; code?: string; issues?: Array<{ path?: Array<string | number> }> };
-  if (Array.isArray(candidate?.issues)) {
-    const fields = [...new Set(candidate.issues.map((issue) => issue.path?.join('.') || 'response'))].slice(0, 8);
-    return { code: 'MODEL_DRAFT_SCHEMA_INVALID', detail: `The model draft failed schema fields: ${fields.join(', ')}.` };
-  }
-  if (candidate?.code === 'MODEL_CALL_LIMIT') return { code: 'MODEL_DRAFT_CALL_LIMIT', detail: 'The model draft exceeded its bounded call limit.' };
-  if (candidate?.code === 'MODEL_SAFETY_BLOCK') return { code: 'MODEL_DRAFT_SAFETY_BLOCK', detail: 'The model draft was blocked by provider safety controls.' };
-  if (candidate?.code === 'MODEL_TIMEOUT') return { code: 'MODEL_DRAFT_TIMEOUT', detail: 'The model draft timed out safely.' };
-  if (candidate?.code === 'MODEL_QUOTA_EXCEEDED') return { code: 'MODEL_DRAFT_QUOTA_EXCEEDED', detail: 'The model draft could not run within provider quota.' };
-  if (candidate?.code === 'MODEL_NOT_FOUND' || candidate?.code === 'MODEL_AUTHENTICATION_FAILED' || candidate?.code === 'MODEL_REQUEST_INVALID') {
-    return { code: 'MODEL_DRAFT_CONFIGURATION_FAILED', detail: 'The model draft provider configuration was rejected.' };
-  }
-  if (candidate?.code === 'MODEL_STRUCTURE_INVALID' || candidate?.name === 'StructuredOutputParsingError') {
-    return { code: 'MODEL_DRAFT_STRUCTURE_INVALID', detail: 'The model draft did not return the required structured response.' };
-  }
-  return { code: 'MODEL_DRAFT_PROVIDER_FAILED', detail: 'The model draft provider call failed safely.' };
-};
-
-const acquireExecutionLock = async (runId: string) => {
-  const client = await db.connect();
-  const result = await client.query('SELECT pg_try_advisory_lock(hashtext($1)) AS acquired', [`agent-run:${runId}`]);
-  if (!result.rows[0]?.acquired) {
-    client.release();
-    return null;
-  }
-  return client;
-};
-
-const releaseExecutionLock = async (client: PoolClient, runId: string) => {
-  try {
-    await client.query('SELECT pg_advisory_unlock(hashtext($1))', [`agent-run:${runId}`]);
-  } finally {
-    client.release();
-  }
-};
 
 export async function executeGenericAgentRun(
   runId: string,
@@ -610,105 +502,19 @@ export async function executeGenericAgentRun(
           [pendingResume.id],
         );
       }
-      if (interrupts.length) {
-        const waitingForApproval = interrupts.some((item) => item.value?.type === 'approval');
-        const status = waitingForApproval ? 'waiting_for_approval' : 'waiting_for_input';
-        const safeDetail = waitingForApproval
-          ? 'A plan change is waiting for student approval.'
-          : 'The assistant is waiting for one clarification.';
-        await db.query(
-          `UPDATE agent_runs SET status = $2, current_step = $2, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $1 AND status = 'running' AND cancellation_requested_at IS NULL`,
-          [runId, status],
-        );
-        await appendRunEvent(runId, status, status, waitingForApproval ? 'APPROVAL_REQUIRED' : 'CLARIFICATION_REQUIRED', safeDetail);
-        if (context.thread_id) {
-          const assistantMessageId = crypto.randomUUID();
-          const assistantContent = waitingForApproval
-            ? safeDetail
-            : interrupts[0]?.value?.question || 'What detail would help me continue?';
-          await db.query(
-            `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
-             VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
-            [assistantMessageId, context.thread_id, context.user_id, assistantContent,
-              JSON.stringify({ kind: waitingForApproval ? 'proposal' : 'clarification', runId })],
-          );
-          await db.query(
-            `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,
-             summary_through_message_id=$3,context_state=$4::jsonb,context_version=context_version+1,
-             last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND user_id=$5`,
-            [context.thread_id, `${conversationSummary}\nassistant: ${assistantContent}`.slice(-16_000), assistantMessageId, JSON.stringify({
-              originalGoal: result.originalGoal,
-              collectedContext: result.collectedContext,
-              activeTutorTopic: result.activeTutorTopic,
-            }), context.user_id],
-          );
-        }
-        if (reservationActive) await budget.finalizeAgentRunBudget({ agentRunId: runId, status: 'released' });
-        reservationActive = false;
-        return { waiting: true, status };
-      }
-      const failed = Boolean(result.failureCode);
-      await db.query(
-        `UPDATE agent_runs SET status = $2, current_step = $3, failure_code = $4,
-         failure_message = $5, plan_source = $6, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1 AND status = 'running' AND cancellation_requested_at IS NULL`,
-        [
-          runId, failed ? 'failed' : 'succeeded', failed ? 'validation' : 'completed',
-          result.failureCode, failed ? result.finalResponse : null,
-          result.usingFallback || fallbackReason === 'error'
-            ? 'fallback_error'
-            : fallbackReason === 'limit' || !specialists
-              ? 'fallback_limit'
-              : 'agentic',
-        ],
-      );
-      const completionCode = failed
-        ? 'PLAN_FAILED'
-        : result.planVersionId
-          ? 'PLAN_PUBLISHED'
-          : result.assistantResponse?.kind === 'tutor'
-            ? 'TUTOR_RESPONSE_COMPLETED'
-            : 'ASSISTANT_RESPONSE_COMPLETED';
-      await appendRunEvent(
-        runId, failed ? 'failed' : 'succeeded', failed ? 'validation' : 'completed', completionCode,
-        failed ? 'The agent run could not produce a valid plan.' : 'The agent run completed safely.',
-      );
-      if (context.thread_id && result.finalResponse) {
-        const assistantMessageId = crypto.randomUUID();
-        await db.query(
-          `INSERT INTO agent_messages (id, thread_id, user_id, role, content, content_metadata)
-           VALUES ($1, $2, $3, 'assistant', $4, $5::jsonb)`,
-          [assistantMessageId, context.thread_id, context.user_id, result.finalResponse, JSON.stringify({
-            kind: result.assistantResponse?.kind || (failed ? 'failure' : result.planVersionId ? 'plan' : 'answer'),
-            runId,
-            citations: result.assistantResponse?.citations || [],
-            suggestedActions: result.assistantResponse?.suggestedActions || [],
-            planSource: result.planVersionId ? (result.usingFallback ? 'fallback' : 'agentic') : undefined,
-          })],
-        );
-        await db.query(
-          `UPDATE agent_threads SET summary=$2,summary_updated_at=CURRENT_TIMESTAMP,
-           summary_through_message_id=$4,context_state=$5::jsonb,
-           context_version=context_version+1,
-           last_activity_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
-           WHERE id=$1 AND user_id=$3`,
-          [context.thread_id, `${conversationSummary}\nassistant: ${result.finalResponse}`.slice(-16_000), context.user_id,
-            assistantMessageId,
-            JSON.stringify({ originalGoal: result.originalGoal, collectedContext: result.collectedContext, activeTutorTopic: result.activeTutorTopic })],
-        );
-      }
-      if (result.intent?.preferenceProposal) {
-        await proposeMemory({
-          userId: context.user_id,
-          runId,
-          key: result.intent.preferenceProposal.key,
-          value: result.intent.preferenceProposal.value,
+      const outcome = await persistGraphResult({
+        runId, context, conversationSummary, result, interrupts, fallbackReason,
+        specialistsAvailable: Boolean(specialists),
+      });
+      if (reservationActive) {
+        await budget.finalizeAgentRunBudget({
+          agentRunId: runId,
+          status: outcome.waiting || outcome.failed ? 'released' : 'finalized',
         });
       }
-      if (reservationActive) await budget.finalizeAgentRunBudget({ agentRunId: runId, status: failed ? 'released' : 'finalized' });
       reservationActive = false;
-      return { succeeded: !failed, result };
+      if (outcome.waiting) return { waiting: true, status: outcome.status };
+      return { succeeded: !outcome.failed, result };
     } finally {
       await checkpointer.end();
     }

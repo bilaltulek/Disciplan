@@ -3,10 +3,10 @@ FROM node:24.19.0-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.backend.json tsconfig.runtime.json tsconfig.worker.json ./
+COPY tsconfig.backend.json tsconfig.runtime.json ./
 COPY backend ./backend
 COPY shared ./shared
-RUN npx tsc -p tsconfig.worker.json
+RUN npx tsc -p tsconfig.runtime.json
 
 FROM node:24.19.0-alpine AS runtime
 

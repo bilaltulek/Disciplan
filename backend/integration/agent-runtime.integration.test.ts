@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AgentCommandService, IdempotencyConflictError } from '../services/agent-command-service.js';
+import { AgentCommandService, IdempotencyConflictError } from './test-agent-command.js';
 import { PlanPublishConflictError, PlanVersionService } from '../services/plan-version-service.js';
 import { AssignmentRepository } from '../repositories/scoped-repositories.js';
 import { createInitialGraphState } from '../agents/graph-state.js';
